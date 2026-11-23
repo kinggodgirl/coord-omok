@@ -76,6 +76,9 @@ label.f{display:grid;gap:6px;font-weight:700}
 .box{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:14px}
 #turnBar{display:flex;align-items:center;gap:10px;font-weight:900;font-size:20px}
 #instr{font-size:18px;line-height:1.5}
+#instr .called{margin-top:10px;border:2px solid var(--accent2);border-radius:14px;padding:6px 10px;text-align:center}
+#instr .called span{font-size:15px;font-weight:700;color:var(--accent2)}
+#instr .called .say{margin:0}
 #instr .say{font-size:40px;text-align:center;margin:6px 0;letter-spacing:.02em}
 .pad{display:grid;gap:8px;margin-top:10px}
 .padrow{display:grid;gap:4px}
@@ -170,8 +173,9 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
       <ol>
         <li>4명이 2명씩 <span class="st b"></span> 흑돌 조와 <span class="st w"></span> 백돌 조가 돼요. 조 안에서 한 명은 <b>말하는 사람</b>, 한 명은 <b>찍는 사람</b>이에요.</li>
         <li><b>말하는 사람</b>은 돌을 놓고 싶은 자리의 좌표를 패드에서 몰래 고른 다음, 짝에게 <b>말로만</b> 알려 줘요. 손으로 가리키면 반칙!</li>
-        <li><b>찍는 사람</b>은 들은 좌표의 점을 찾아 찍어요. 말한 좌표와 다른 곳에 찍으면 ✗ — <b id="ruleP">차례를 잃어요</b>.</li>
-        <li>먼저 돌 <b id="ruleN">4</b>개를 한 줄로(가로·세로·대각선) 놓는 조가 이겨요. 한 판이 끝나면 조 안에서 역할을 바꿔요.</li>
+        <li><b>찍는 사람</b>은 들은 좌표의 점을 찾아 찍어요. <span id="ruleShow">(찍는 사람 화면에도 짝이 고른 좌표가 떠요.)</span> 말한 좌표와 다른 곳에 찍으면 ✗ — <b id="ruleP">차례를 잃어요</b>.</li>
+        <li>먼저 돌 <b id="ruleN">4</b>개를 한 줄로(가로·세로·대각선) 놓는 조가 이겨요.</li>
+        <li id="ruleAlt"><b>번갈아 부르기</b>: 우리 조 차례가 끝날 때마다 말하는 사람과 찍는 사람이 서로 바뀌어요.</li>
       </ol>
     </div>
     <div style="text-align:center"><button class="link" id="btnSolo">🤖 혼자 연습하기 (좌표만 골라서 컴퓨터와 대결)</button></div>
@@ -234,7 +238,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 
 <script>
 'use strict';
-const APP_VER = 2, R = 5;
+const APP_VER = 3, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -250,7 +254,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const DEV = sessionStorage.cgDev || (sessionStorage.cgDev = 'd' + Math.random().toString(36).slice(2, 10));
 const rid = () => Date.now() + Math.random();
 
-const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true }, paused: false, classOk: false, quiz: null, status: '' };
+const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true }, paused: false, classOk: false, quiz: null, status: '' };
 let myName = localStorage.cgName || '';
 
 /* ---------- 화면 공통 ---------- */
@@ -344,7 +348,7 @@ function onTeacher(m) {
 }
 function applySettings(s) {
   if (!s) return; ST.settings = Object.assign(ST.settings, s);
-  if (room && room.kind === 'host' && room.E.phase === 'lobby') { room.E.n = ST.settings.n; room.E.penalty = ST.settings.penalty; update(); }
+  if (room && room.kind === 'host' && room.E.phase === 'lobby') { applyRules(room.E); update(); }
   refreshHome();
 }
 function setPause(p) {
@@ -365,12 +369,21 @@ function refreshHome() {
   $('#btnSolo').classList.toggle('hidden', !DEMO && (!ST.settings.solo || !ok));
   $('#ruleN').textContent = ST.settings.n;
   $('#ruleP').textContent = ST.settings.penalty ? '차례를 잃어요' : '다시 찍어요';
+  $('#ruleAlt').innerHTML = ST.settings.alt ? '<b>번갈아 부르기</b>: 우리 조 차례가 끝날 때마다 말하는 사람과 찍는 사람이 서로 바뀌어요.' : '한 판이 끝나면 조 안에서 말하는 사람과 찍는 사람이 바뀌어요.';
+  $('#ruleShow').classList.toggle('hidden', !ST.settings.showCall);
 }
 
 /* ---------- 게임 엔진 (방장 기기 / 혼자 모드에서만 실행) ---------- */
+function applyRules(E) { E.n = ST.settings.n; E.penalty = ST.settings.penalty; E.alt = ST.settings.alt !== false; E.showCall = ST.settings.showCall !== false; }
+function humanTeam(E, t) { return t !== E.cpuTeam && !(E.autoPlace && t === 'A'); }
+function swapTeam(E, t) { if (!humanTeam(E, t)) return; const c = E.seats[t + 'c'], p = E.seats[t + 'p']; E.seats[t + 'c'] = p; E.seats[t + 'p'] = c; }
+function pst(E, seat) {
+  const p = E.seats[seat]; if (!p) return { calls: 0, ok: 0, bad: 0 };
+  return E.stats[p.dev] || (E.stats[p.dev] = { name: p.name, team: seat[0], calls: 0, ok: 0, bad: 0 });
+}
 function mkEngine(o) {
   return {
-    code: o.code || '', mode: o.mode, n: o.n || 4, penalty: o.penalty !== false, cpuTeam: o.cpuTeam || null, autoPlace: !!o.autoPlace,
+    code: o.code || '', mode: o.mode, n: o.n || 4, penalty: o.penalty !== false, alt: ST.settings.alt !== false, showCall: ST.settings.showCall !== false, cpuTeam: o.cpuTeam || null, autoPlace: !!o.autoPlace,
     seats: { Ac: null, Ap: null, Bc: null, Bp: null }, members: [], board: {}, turn: 'A', first: 'A', phase: 'lobby',
     secret: null, log: [], stats: {}, winner: null, line: null, ev: null, round: 0, moves: 0, last: null, gid: null, reported: false
   };
@@ -383,7 +396,7 @@ function seatsOf(E, dev) { return SEATS.filter(s => E.seats[s] && E.seats[s].dev
 function eStart(E) {
   Object.assign(E, { board: {}, log: [], phase: 'call', turn: E.first, secret: null, winner: null, line: null, ev: null, moves: 0, last: null, reported: false });
   E.round++; E.gid = (E.code || 'L') + '-' + Date.now().toString(36) + '-' + E.round + '-' + DEV.slice(1, 5);
-  E.stats = {}; SEATS.forEach(s => (E.stats[s] = { calls: 0, ok: 0, bad: 0 }));
+  E.stats = {}; SEATS.forEach(s => { if (E.seats[s] && humanTeam(E, s[0])) pst(E, s); });
 }
 const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 function checkWin(b, x, y, t, n) {
@@ -400,13 +413,14 @@ function ePut(E, team, x, y) {
   const line = checkWin(E.board, x, y, team, E.n);
   if (line) { E.phase = 'over'; E.winner = team; E.line = line; return; }
   if (Object.keys(E.board).length >= (2 * R + 1) ** 2) { E.phase = 'over'; E.winner = 'draw'; return; }
+  if (E.alt) swapTeam(E, team);
   E.turn = other(team); E.phase = 'call';
 }
 function eCall(E, seat, x, y) {
   if (E.phase !== 'call' || seat !== E.turn + 'c') return 'notyou';
   if (!inR(x, y)) return 'range';
   if (E.board[K(x, y)]) return 'taken';
-  E.stats[seat].calls++;
+  pst(E, seat).calls++;
   if (E.autoPlace) { E.ev = { id: rid(), kind: 'put', team: E.turn, x, y }; ePut(E, E.turn, x, y); return 'ok'; }
   E.secret = { x, y }; E.phase = 'place'; E.ev = null; return 'ok';
 }
@@ -414,11 +428,11 @@ function ePlace(E, seat, x, y) {
   if (E.phase !== 'place' || seat !== E.turn + 'p' || !E.secret) return 'notyou';
   if (!inR(x, y)) return 'range';
   const s = E.secret, team = E.turn;
-  if (s.x === x && s.y === y && !E.board[K(x, y)]) { E.stats[seat].ok++; E.ev = { id: rid(), kind: 'put', team, x, y }; ePut(E, team, x, y); return 'ok'; }
-  E.stats[seat].bad++;
+  if (s.x === x && s.y === y && !E.board[K(x, y)]) { pst(E, seat).ok++; E.ev = { id: rid(), kind: 'put', team, x, y }; ePut(E, team, x, y); return 'ok'; }
+  pst(E, seat).bad++;
   E.log.push({ team, x: s.x, y: s.y, tx: x, ty: y, ok: false });
   E.ev = { id: rid(), kind: 'wrong', team, said: { x: s.x, y: s.y }, tapped: { x, y }, pass: E.penalty };
-  if (E.penalty) { E.turn = other(team); E.phase = 'call'; E.secret = null; }
+  if (E.penalty) { if (E.alt) swapTeam(E, team); E.turn = other(team); E.phase = 'call'; E.secret = null; }
   return 'wrong';
 }
 function lineScore(b, x, y, t, n) {
@@ -457,19 +471,17 @@ function eCpu(E) {
   ePut(E, E.turn, m.x, m.y);
 }
 function eAgain(E) {
-  ['A', 'B'].forEach(t => {
-    if (t === E.cpuTeam || (E.autoPlace && t === 'A')) return;
-    const c = E.seats[t + 'c'], p = E.seats[t + 'p']; E.seats[t + 'c'] = p; E.seats[t + 'p'] = c;
-  });
+  if (!E.alt) ['A', 'B'].forEach(t => swapTeam(E, t));
   E.first = other(E.first); eStart(E);
 }
 function viewFor(E, mine) {
   const v = {
-    mode: E.mode, code: E.code, n: E.n, penalty: E.penalty, cpuTeam: E.cpuTeam, autoPlace: E.autoPlace, seats: E.seats, members: E.members,
+    mode: E.mode, code: E.code, n: E.n, penalty: E.penalty, alt: E.alt, showCall: E.showCall, cpuTeam: E.cpuTeam, autoPlace: E.autoPlace, seats: E.seats, members: E.members,
     board: E.board, turn: E.turn, phase: E.phase, log: E.log.slice(-60), stats: E.stats, winner: E.winner, line: E.line, ev: E.ev,
     round: E.round, moves: E.moves, last: E.last
   };
   if (E.phase === 'place' && mine.includes(E.turn + 'c') && !mine.includes(E.turn + 'p')) v.secret = E.secret;
+  if (E.phase === 'place' && E.showCall && mine.includes(E.turn + 'p') && E.secret) v.called = E.secret;
   return v;
 }
 
@@ -494,10 +506,10 @@ function hostAct(dev, a) {
       break;
     }
     case 'unsit': if (E.phase === 'lobby') mine.forEach(s => (E.seats[s] = null)); break;
-    case 'start': if (dev === DEV && E.phase === 'lobby' && ready(E)) { E.n = ST.settings.n; E.penalty = ST.settings.penalty; eStart(E); } break;
+    case 'start': if (dev === DEV && E.phase === 'lobby' && ready(E)) { applyRules(E); eStart(E); } break;
     case 'call': { const s = E.turn + 'c'; if (mine.includes(s)) eCall(E, s, a.x, a.y); break; }
     case 'place': { const s = E.turn + 'p'; if (mine.includes(s)) ePlace(E, s, a.x, a.y); break; }
-    case 'again': if (E.phase === 'over' && mine.length && ready(E)) { E.n = ST.settings.n; E.penalty = ST.settings.penalty; eAgain(E); } break;
+    case 'again': if (E.phase === 'over' && mine.length && ready(E)) { applyRules(E); eAgain(E); } break;
     case 'lobby': if (dev === DEV && E.phase === 'over') E.phase = 'lobby'; break;
   }
   update();
@@ -526,11 +538,7 @@ function update() {
 }
 function reportResult(E) {
   if (DEMO || E.mode === 'demo') return;
-  const players = [];
-  SEATS.forEach(s => {
-    const p = E.seats[s]; if (!p || (E.cpuTeam && s[0] === E.cpuTeam) || (E.autoPlace && s === 'Ap')) return;
-    players.push({ name: p.name, team: s[0], role: s[1], calls: E.stats[s].calls, ok: E.stats[s].ok, bad: E.stats[s].bad });
-  });
+  const players = Object.values(E.stats).map(p => ({ name: p.name, team: p.team, role: p.calls && (p.ok + p.bad) ? 'cp' : (p.calls ? 'c' : 'p'), calls: p.calls, ok: p.ok, bad: p.bad }));
   sendT({ t: 'result', gid: E.gid, mode: E.mode, n: E.n, winner: E.winner, moves: E.moves, players, cpuTeam: E.cpuTeam });
 }
 
@@ -660,14 +668,14 @@ function renderLobby(v, mine) {
   const isHost = room.kind === 'host';
   $('#lbCode').textContent = v.code;
   $('#lbHint').textContent = v.mode === 'cpu2' ? '짝에게 알려 주세요 (2명)' : '친구들에게 알려 주세요 (4명)';
-  $('#lbInfo').textContent = `이번 판: ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · 자리를 눌러 앉으세요`;
+  $('#lbInfo').textContent = `이번 판: ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'} · 자리를 눌러 앉으세요`;
   let h = '';
   ['A', 'B'].forEach(t => {
     h += `<div class="card team"><h3>${stoneHTML(t)} ${TEAM[t]}</h3>`;
     if (v.cpuTeam === t) h += `<div class="seat cpu"><div class="role">상대</div><div class="who">🤖 컴퓨터</div></div>`;
     else ['c', 'p'].forEach(r => {
       const s = t + r, p = v.seats[s], me = mine.includes(s);
-      h += `<button class="seat ${p ? 'taken' : ''} ${me ? 'me' : ''} ${p && !p.on ? 'off' : ''}" data-seat="${s}"><div class="role">${r === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람'}</div><div class="who">${p ? esc(p.name) + (me ? ' (나)' : '') + (!p.on ? ' · 끊김' : '') : '비어 있음 — 눌러서 앉기'}</div></button>`;
+      h += `<button class="seat ${p ? 'taken' : ''} ${me ? 'me' : ''} ${p && !p.on ? 'off' : ''}" data-seat="${s}"><div class="role">${v.alt ? '처음 ' : ''}${r === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람'}</div><div class="who">${p ? esc(p.name) + (me ? ' (나)' : '') + (!p.on ? ' · 끊김' : '') : '비어 있음 — 눌러서 앉기'}</div></button>`;
     });
     h += '</div>';
   });
@@ -697,6 +705,10 @@ function renderGame(v, mine) {
     } else if (v.ev.kind === 'left') toast(`${v.ev.name}의 연결이 끊겼어요. 다시 들어오면 이어서 해요.`, true, 3500);
     else if (v.ev.kind === 'put') UI.popId = v.ev.id;
   }
+  const mineKey = mine.join(',');
+  if (UI.mineKey != null && UI.mineKey !== mineKey && v.alt && v.round === UI.mineRound && mine.length === 1 && v.mode !== 'demo')
+    toast(`역할이 바뀌었어요! 다음 우리 조 차례에 나는 ${mine[0][1] === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람'}`, false, 3000);
+  UI.mineKey = mineKey; UI.mineRound = v.round;
   const t = v.turn, cpuTurn = v.cpuTeam === t;
   const iCall = mine.includes(t + 'c'), iPlace = mine.includes(t + 'p');
   let instr = '', showCall = false, showPlace = false;
@@ -708,7 +720,8 @@ function renderGame(v, mine) {
     else if (iPlace) instr = '짝(말하는 사람)이 좌표를 고르는 중이에요. 잠시 기다리세요.';
     else instr = `${TEAM[t]} 차례 — 말하는 사람이 좌표를 고르는 중이에요.`;
   } else if (v.phase === 'place') {
-    if (iPlace) { showPlace = true; instr = iCall ? '이제 <b>찍는 사람</b> 차례: 들은 좌표의 자리를 누르고 [여기에 찍기]를 누르세요.' : '<b>나는 찍는 사람</b> — 짝이 말하는 좌표를 잘 듣고, 그 점을 누른 다음 [여기에 찍기]를 누르세요.'; }
+    if (iPlace) { showPlace = true; instr = iCall ? '이제 <b>찍는 사람</b> 차례: 들은 좌표의 자리를 누르고 [여기에 찍기]를 누르세요.' : '<b>나는 찍는 사람</b> — 짝이 말하는 좌표를 잘 듣고, 그 점을 누른 다음 [여기에 찍기]를 누르세요.';
+      if (v.called) instr += `<div class="called"><span>짝이 고른 좌표</span><div class="say m">${P(v.called.x, v.called.y)}</div></div>`; }
     else if (iCall && v.secret) instr = `이제 짝에게 <b>말로만</b> 알려 주세요.<div class="say m">${P(v.secret.x, v.secret.y)}</div>손가락으로 가리키면 반칙!`;
     else instr = `${TEAM[t]} 차례 — 말하는 좌표를 같이 들어 보세요!`;
   }
@@ -738,7 +751,7 @@ function renderGame(v, mine) {
           : '② 말하는 사람이 좌표를 <b>말로</b> 알려 주면, <b>찍는 사람</b>이 그 점을 찾아 찍습니다. 다르게 찍으면 ✗, 차례를 잃어요.';
   }
   // 선수·기록
-  $('#goal').textContent = `먼저 ${v.n}개를 한 줄로! (가로·세로·대각선)`;
+  $('#goal').textContent = `먼저 ${v.n}개를 한 줄로! (가로·세로·대각선)` + (v.alt && !v.autoPlace ? ' · 차례마다 역할 교대' : '');
   let ph = '';
   ['A', 'B'].forEach(tm => {
     const cpu = v.cpuTeam === tm;
@@ -809,15 +822,15 @@ function showResult(v, mine) {
       : dy === dx ? '<i class="m">x</i>좌표가 1씩 커질 때 <i class="m">y</i>좌표도 1씩 커져요.' : '<i class="m">x</i>좌표가 1씩 커질 때 <i class="m">y</i>좌표는 1씩 작아져요.';
     h += `<div class="box" style="margin-top:8px"><div style="font-weight:900">한 줄로 놓인 점들의 좌표</div><div class="winpts m">${L.map(p => P(p.x, p.y)).join(', ')}</div><div style="font-size:16px">이 점들의 좌표에서 어떤 규칙이 보이나요?</div><details class="hint"><summary>확인하기</summary>${hint}</details></div>`;
   }
-  const rows = SEATS.filter(s => !(v.cpuTeam && s[0] === v.cpuTeam) && !(v.autoPlace && s === 'Ap') && v.seats[s]);
+  const rows = Object.values(v.stats || {}).sort((a, b) => a.team.localeCompare(b.team));
   if (rows.length && !v.autoPlace) {
-    h += '<table><tr><th>조</th><th>이름</th><th>역할</th><th>찍기 성공</th><th>찍기 실수</th></tr>';
-    rows.forEach(s => { const st = v.stats[s] || {}; h += `<tr><td>${stoneHTML(s[0])}</td><td>${esc(v.seats[s].name)}</td><td>${ROLE[s[1]]}</td><td>${s[1] === 'p' ? st.ok : '—'}</td><td>${s[1] === 'p' ? st.bad : '—'}</td></tr>`; });
+    h += '<table><tr><th>조</th><th>이름</th><th>말하기</th><th>찍기 성공</th><th>찍기 실수</th></tr>';
+    rows.forEach(st => { h += `<tr><td>${stoneHTML(st.team)}</td><td>${esc(st.name)}</td><td>${st.calls}번</td><td>${st.ok}</td><td>${st.bad}</td></tr>`; });
     h += '</table>';
   }
   const isHost = room && room.kind === 'host';
   h += '<div class="row" style="margin-top:12px">';
-  if (mine.length) h += `<button class="btn pri" id="btnAgain">${v.autoPlace ? '한 판 더' : '역할 바꿔서 한 판 더'}</button>`;
+  if (mine.length) h += `<button class="btn pri" id="btnAgain">${v.autoPlace || v.alt ? '한 판 더' : '역할 바꿔서 한 판 더'}</button>`;
   if (isHost) h += '<button class="btn" id="btnToLobby">대기실로</button>';
   h += '<button class="btn" id="btnLeave3">나가기</button></div>';
   if (!isHost && room && room.kind === 'client') h += '<p class="sub" style="font-size:15px;margin-top:8px">누구든 [한 판 더]를 누르면 바로 시작해요.</p>';
