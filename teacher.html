@@ -173,7 +173,7 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
 
 <script>
 'use strict';
-const APP_VER = 4;
+const APP_VER = 5;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mathify = s => esc(s).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>');
