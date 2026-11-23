@@ -6,8 +6,10 @@
 <title>좌표평면 오목</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=STIX+Two+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="turn-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="fbnet.js"></script>
 <script src="problems.js"></script>
 <style>
 :root{--ink:#16181c;--paper:#f7f5f0;--card:#fff;--line:#dcd8cf;--muted:#6d6a64;--accent:#d2452f;--accent2:#1f4e8c;--ok:#1d7a46;--r:16px}
@@ -142,8 +144,8 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
       <button id="btnJoinClass" class="btn pri">수업 들어가기</button>
       <div id="diag" class="hidden">
         <div data-d="1"><span class="s">·</span>① 연결 서버</div>
-        <div data-d="2"><span class="s">·</span>② 선생님 찾기</div>
-        <div data-d="3"><span class="s">·</span>③ 직접 연결</div>
+        <div data-d="2"><span class="s">·</span>② 수업 찾기</div>
+        <div data-d="3"><span class="s">·</span>③ 수업 들어가기</div>
         <div id="diagMsg" class="warn" style="text-align:left"></div>
       </div>
     </div>
@@ -232,7 +234,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 
 <script>
 'use strict';
-const APP_VER = 1, PREFIX = 'kgg-coordomok-', R = 5;
+const APP_VER = 2, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -268,16 +270,10 @@ function toast(msg, bad, ms) {
 }
 function hdr() { $('#hdrName').textContent = myName || ''; $('#hdrDot').classList.toggle('on', ST.classOk || DEMO); }
 
-/* ---------- 연결 설정 ---------- */
-let ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
-async function loadTurn() {
-  const c = window.TURN_CONFIG; if (!c || !c.app || !c.apiKey) return;
-  try { const r = await fetch(`https://${c.app}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(c.apiKey)}`); const l = await r.json(); if (Array.isArray(l)) ICE = ICE.concat(l); } catch (e) { }
-}
-const peerOpts = () => ({ config: { iceServers: ICE }, debug: 0 });
-
-/* ---------- 수업(교사) 연결 ---------- */
-let cPeer = null, cPeerOpen = false, tConn = null, lastPong = 0, pingT = null, lockT = null, diagT = null, retryT = null, everConnected = false;
+/* ---------- 수업(교사) 연결 : Firebase (fbnet.js) ----------
+   omok/{수업 코드}/…  교사 화면이 hub를 차지하고, 학생은 up으로 보내고 dm·down으로 받음
+------------------------------------------------------------ */
+let hub = null, lockT = null, diagT = null, everConnected = false;
 function setDiag(n, s, msg) {
   const el = $(`#diag [data-d="${n}"] .s`); if (el) el.textContent = { busy: '⏳', ok: '✅', fail: '❌', '': '·' }[s];
   if (msg !== undefined) $('#diagMsg').textContent = msg;
@@ -293,69 +289,46 @@ function joinClass() {
   diagT = setTimeout(() => {
     if (ST.classOk) return;
     $('#btnJoinClass').disabled = false; $('#btnJoinClass').textContent = '다시 시도';
-    if (!cPeerOpen) setDiag(1, 'fail', '연결 서버에 닿지 않아요. 인터넷 연결을 확인하세요.');
-    else if (ST.peerMissing) setDiag(2, 'fail', '이 수업 코드를 찾지 못했어요. 선생님 화면의 코드를 다시 확인하세요.');
-    else { setDiag(2, 'ok'); setDiag(3, 'fail', '선생님은 찾았지만 직접 연결이 막혔어요. 같은 와이파이인지 확인하고 선생님께 알려 주세요.'); }
-  }, 15000);
-  ensurePeer(() => dialTeacher());
+    if (!ST.srvOn) setDiag(1, 'fail', '연결 서버에 닿지 않아요. 와이파이를 확인하세요.');
+    else if (ST.hubOn !== true) setDiag(2, 'fail', '이 수업 코드를 찾지 못했어요. 선생님 화면이 열려 있는지, 코드가 맞는지 확인하세요.');
+    else setDiag(3, 'fail', '수업에 들어가지 못했어요. 새로고침한 뒤 다시 시도해 주세요.');
+  }, 12000);
+  openClass();
 }
-function ensurePeer(cb) {
-  if (cPeer && cPeerOpen && !cPeer.destroyed) { cb(); return; }
-  cPeer = new Peer(peerOpts()); cPeerOpen = false;
-  cPeer.on('open', () => { cPeerOpen = true; setDiag(1, 'ok'); cb(); });
-  cPeer.on('disconnected', () => { try { cPeer.reconnect(); } catch (e) { } });
-  cPeer.on('error', e => {
-    if (e && e.type === 'peer-unavailable') {
-      const msg = String(e.message || '');
-      if (msg.indexOf('class-') >= 0) { ST.peerMissing = true; setDiag(2, 'fail', '이 수업 코드를 찾지 못했어요.'); }
-      else if (room && room.kind === 'client' && !room.view) { toast('방을 찾지 못했어요. 방 코드를 확인하세요.', true); room = null; show('home'); }
-    }
+function openClass() {
+  if (!FBNet.ok) { setDiag(1, 'fail', '연결 설정(firebase-config.js)이 없어요. 선생님께 알려 주세요.'); $('#btnJoinClass').disabled = false; return; }
+  if (hub) hub.close();
+  ST.srvOn = false; ST.hubOn = null;
+  hub = FBNet.client('omok/' + ST.code, DEV, {
+    info: { name: myName, status: ST.status || '처음 화면', ver: APP_VER },
+    onServer(on) { ST.srvOn = on; if (on) setDiag(1, 'ok'); },
+    onHub(ex) { ST.hubOn = ex; if (ex) setDiag(2, 'ok'); else if (!everConnected) setDiag(2, 'busy', '선생님 화면을 찾는 중…'); },
+    onMsg: onTeacher,
+    onState(ok) { if (ok) classUp(); else classLost(); }
   });
 }
-function dialTeacher() {
-  ST.peerMissing = false; setDiag(2, 'busy');
-  if (tConn) { try { tConn.close(); } catch (e) { } }
-  const conn = cPeer.connect(PREFIX + 'class-' + ST.code, { reliable: true });
-  tConn = conn;
-  conn.on('open', () => {
-    if (tConn !== conn) return;
-    setDiag(2, 'ok'); setDiag(3, 'ok', '');
-    ST.classOk = true; everConnected = true; lastPong = Date.now(); hdr();
-    clearTimeout(lockT); clearTimeout(retryT); clearTimeout(diagT); $('#lockOv').classList.add('hidden');
-    conn.send({ t: 'hi', name: myName, dev: DEV, status: ST.status || '처음 화면', ver: APP_VER });
-    clearInterval(pingT);
-    pingT = setInterval(() => {
-      if (tConn !== conn) return;
-      try { conn.send({ t: 'ping' }); } catch (e) { }
-      if (Date.now() - lastPong > 12000) { try { conn.close(); } catch (e) { } classLost(); }
-    }, 4000);
-    if (!$('#scr-join').classList.contains('hidden')) goHome();
-  });
-  conn.on('data', onTeacher);
-  conn.on('close', () => { if (tConn === conn) classLost(); });
+function classUp() {
+  setDiag(3, 'ok', ''); ST.classOk = true; everConnected = true; hdr();
+  clearTimeout(lockT); clearTimeout(diagT); $('#lockOv').classList.add('hidden');
+  hub.send({ t: 'hi', name: myName, dev: DEV, status: ST.status || '처음 화면', ver: APP_VER });
+  if (!$('#scr-join').classList.contains('hidden')) goHome(); else refreshHome();
 }
 function classLost() {
-  if (!ST.classOk && !everConnected) return;
-  ST.classOk = false; hdr(); tConn = null; clearInterval(pingT);
+  if (!ST.classOk) return;
+  ST.classOk = false; hdr();
+  $('#lockMsg').textContent = ST.srvOn ? '선생님 화면이 닫혔어요. 다시 열리면 자동으로 이어져요.' : '인터넷 연결이 끊겼어요. 다시 연결되면 자동으로 이어져요.';
   clearTimeout(lockT); lockT = setTimeout(() => { if (!ST.classOk) $('#lockOv').classList.remove('hidden'); }, 3000);
-  clearTimeout(retryT); retryT = setTimeout(retryClass, 4000);
   refreshHome();
 }
-function retryClass() {
-  if (ST.classOk) return;
-  $('#lockMsg').textContent = '다시 연결하는 중…';
-  ensurePeer(() => dialTeacher());
-  clearTimeout(retryT); retryT = setTimeout(() => { if (!ST.classOk) { $('#lockMsg').textContent = '아직 연결되지 않았어요. 잠시 후 다시 시도해요.'; retryClass(); } }, 8000);
-}
-function sendT(m) { if (tConn && ST.classOk) try { tConn.send(m); } catch (e) { } }
-function sendStatus(s) { if (s === ST.status) return; ST.status = s; sendT({ t: 'status', status: s }); }
+function retryClass() { $('#lockMsg').textContent = '다시 연결하는 중…'; openClass(); }
+function sendT(m) { if (hub && ST.classOk) hub.send(m); }
+function sendStatus(s) { if (s === ST.status) return; ST.status = s; if (hub) hub.setInfo({ status: s }); sendT({ t: 'status', status: s }); }
 
 function onTeacher(m) {
   if (!m || !m.t) return;
   switch (m.t) {
-    case 'pong': lastPong = Date.now(); break;
+    case 'pong': break;
     case 'sync':
-      lastPong = Date.now();
       if (m.ver !== APP_VER) $('#verBar').classList.remove('hidden');
       applySettings(m.settings); setPause(m.pause);
       if (m.quiz) openQuiz(m.quiz); else closeQuiz();
@@ -561,42 +534,41 @@ function reportResult(E) {
   sendT({ t: 'result', gid: E.gid, mode: E.mode, n: E.n, winner: E.winner, moves: E.moves, players, cpuTeam: E.cpuTeam });
 }
 
+/* 방: omok/{수업 코드}/rooms/{방 코드}/… — 방장 기기가 hub를 차지하고 게임 엔진을 돌림 */
+const roomPath = code => 'omok/' + ST.code + '/rooms/' + code;
 function createRoom(mode) {
   if (!ST.classOk) return;
   const code = String(1000 + Math.floor(Math.random() * 9000));
   const E = mkEngine({ code, mode, n: ST.settings.n, penalty: ST.settings.penalty, cpuTeam: mode === 'cpu2' ? 'B' : null });
   E.seats.Ac = { name: myName, dev: DEV, on: true };
-  const peer = new Peer(PREFIX + 'room-' + code, peerOpts());
-  room = { kind: 'host', mode, code, cap: mode === 'cpu2' ? 2 : 4, peer, members: new Map(), E, ready: false };
+  room = { kind: 'host', mode, code, cap: mode === 'cpu2' ? 2 : 4, net: null, members: new Map(), E, ready: false };
   room.members.set(DEV, { name: myName, dev: DEV, conn: null, on: true });
   const r = room;
   $('#lbCode').textContent = '····'; $('#lbMsg').textContent = '방을 만드는 중…'; show('lobby');
-  peer.on('open', () => { if (room !== r) return; r.ready = true; $('#lbMsg').textContent = ''; update(); });
-  peer.on('connection', conn => onMemberConn(r, conn));
-  peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) { } });
-  peer.on('error', e => {
-    if (room !== r) return;
-    if (e && e.type === 'unavailable-id') { try { peer.destroy(); } catch (x) { } room = null; createRoom(mode); }
+  FBNet.claim(roomPath(code) + '/hub', DEV).then(ok => {
+    if (room !== r) { if (ok) FBNet.release(roomPath(code) + '/hub'); return; }
+    if (!ok) { room = null; createRoom(mode); return; }          // 이미 쓰는 방 코드 → 다른 코드로
+    r.net = FBNet.hub(roomPath(code), {
+      onMsg: (dev, m) => onMemberMsg(r, dev, m),
+      onPresence: (dev, on) => { if (room !== r || on || dev === DEV) return; const mm = r.members.get(dev); if (mm && mm.on) dropMember(r, dev); }
+    });
+    r.offConn = FBNet.onConnected(on => { if (on && room === r) FBNet.claim(roomPath(code) + '/hub', DEV); });   // 잠깐 끊겼다 돌아오면 방 표시 다시 세우기
+    r.ready = true; $('#lbMsg').textContent = ''; update();
   });
 }
-function onMemberConn(r, conn) {
-  let dev = null;
-  conn.on('data', m => {
-    if (room !== r || !m) return;
-    if (m.t === 'join') {
-      const exist = r.members.get(m.dev);
-      const online = [...r.members.values()].filter(x => x.on).length;
-      if (!exist && online >= r.cap) { try { conn.send({ t: 'full' }); } catch (e) { } setTimeout(() => { try { conn.close(); } catch (e) { } }, 300); return; }
-      dev = m.dev;
-      if (exist && exist.conn && exist.conn !== conn) { try { exist.conn.close(); } catch (e) { } }
-      const name = String(m.name || '학생').slice(0, 10);
-      r.members.set(dev, { name, dev, conn, on: true });
-      SEATS.forEach(s => { const x = r.E.seats[s]; if (x && x.dev === dev) { x.on = true; x.name = name; } });
-      update();
-    } else if (m.t === 'act' && dev) hostAct(dev, m.a);
-    else if (m.t === 'leave' && dev) dropMember(r, dev);
-  });
-  conn.on('close', () => { if (dev && room === r) { const mm = r.members.get(dev); if (mm && mm.conn === conn) dropMember(r, dev); } });
+function memberConn(r, dev) { return { send: m => { if (!r.net) return; if (m.t === 'state') r.net.setView(dev, m); else r.net.sendTo(dev, m); } }; }
+function onMemberMsg(r, dev, m) {
+  if (room !== r || !m) return;
+  if (m.t === 'join') {
+    const exist = r.members.get(dev);
+    const online = [...r.members.values()].filter(x => x.on).length;
+    if (!exist && online >= r.cap) { memberConn(r, dev).send({ t: 'full' }); return; }
+    const name = String(m.name || '학생').slice(0, 10);
+    r.members.set(dev, { name, dev, conn: memberConn(r, dev), on: true });
+    SEATS.forEach(s => { const x = r.E.seats[s]; if (x && x.dev === dev) { x.on = true; x.name = name; } });
+    update();
+  } else if (m.t === 'act') { const mm = r.members.get(dev); if (mm && mm.on) hostAct(dev, m.a); }
+  else if (m.t === 'leave') dropMember(r, dev);
 }
 function dropMember(r, dev) {
   const E = r.E, mm = r.members.get(dev); if (!mm || dev === DEV) return;
@@ -607,19 +579,27 @@ function dropMember(r, dev) {
 function joinRoom(code) {
   if (!ST.classOk) return;
   if (!/^\d{4}$/.test(code)) return toast('방 코드 4자리를 입력하세요', true);
-  const conn = cPeer.connect(PREFIX + 'room-' + code, { reliable: true });
-  room = { kind: 'client', code, conn, view: null, mine: [], leaving: false };
+  room = { kind: 'client', code, conn: null, view: null, mine: [], leaving: false };
   const r = room;
   $('#lbCode').textContent = code; $('#lbMsg').textContent = '방에 들어가는 중…'; $('#lbTeams').innerHTML = ''; $('#btnStart').classList.add('hidden'); show('lobby');
-  const to = setTimeout(() => { if (room === r && !r.view) { toast('방을 찾지 못했어요. 코드를 확인하세요.', true); try { conn.close(); } catch (e) { } room = null; goHome(); } }, 10000);
-  conn.on('open', () => conn.send({ t: 'join', name: myName, dev: DEV, ver: APP_VER }));
-  conn.on('data', m => {
-    if (room !== r || !m) return;
-    if (m.t === 'state') { clearTimeout(to); r.view = m.s; r.mine = m.mine || []; $('#lbMsg').textContent = ''; render(); }
-    else if (m.t === 'full') { clearTimeout(to); toast('방이 가득 찼어요', true); room = null; goHome(); }
-    else if (m.t === 'closed') { room = null; hideResult(); goHome(); toast('방장이 방을 닫았어요', true, 3500); }
+  const gone = msg => { if (room !== r) return; room = null; if (r.conn) r.conn.close(); hideResult(); goHome(); toast(msg, true, 3500); };
+  const to = setTimeout(() => { if (room === r && !r.view) gone('방을 찾지 못했어요. 코드를 확인하세요.'); }, 10000);
+  FBNet.exists(roomPath(code) + '/hub').then(ex => {
+    if (room !== r) return;
+    if (!ex) { clearTimeout(to); gone('방을 찾지 못했어요. 방 코드를 확인하세요.'); return; }
+    let seen = false;
+    r.conn = FBNet.client(roomPath(code), DEV, {
+      info: { name: myName }, presence: 'remove',
+      onView: m => { if (room !== r || !m || m.t !== 'state') return; clearTimeout(to); r.view = m.s; r.mine = m.mine || []; $('#lbMsg').textContent = ''; render(); },
+      onMsg: m => {
+        if (room !== r || !m) return;
+        if (m.t === 'full') { clearTimeout(to); gone('방이 가득 찼어요'); }
+        else if (m.t === 'closed') gone('방장이 방을 닫았어요');
+      },
+      onHub: ex2 => { if (ex2) { seen = true; return; } if (seen && !r.leaving) gone('방장과 연결이 끊겼어요'); },
+      onState: ok => { if (ok && room === r) setTimeout(() => { if (room === r && r.conn) r.conn.send({ t: 'join', name: myName, dev: DEV, ver: APP_VER }); }, 0); }
+    });
   });
-  conn.on('close', () => { if (room === r && !r.leaving) { room = null; hideResult(); goHome(); toast('방장과 연결이 끊겼어요', true, 3500); } });
 }
 function startLocal(mode) {
   const E = mkEngine({ code: '', mode, n: ST.settings.n, penalty: ST.settings.penalty, cpuTeam: 'B', autoPlace: mode === 'solo' });
@@ -631,10 +611,11 @@ function startLocal(mode) {
 function leaveRoom(silent) {
   if (!room) return;
   const r = room; room = null; r.leaving = true; clearTimeout(r.cpuT);
-  if (r.kind === 'client') { try { r.conn.send({ t: 'leave' }); } catch (e) { } setTimeout(() => { try { r.conn.close(); } catch (e) { } }, 250); }
+  if (r.kind === 'client' && r.conn) { r.conn.send({ t: 'leave' }); setTimeout(() => r.conn.close(), 250); }
   if (r.kind === 'host') {
-    for (const m of r.members.values()) if (m.conn) try { m.conn.send({ t: 'closed' }); } catch (e) { }
-    setTimeout(() => { try { r.peer.destroy(); } catch (e) { } }, 300);
+    for (const m of r.members.values()) if (m.conn) m.conn.send({ t: 'closed' });
+    if (r.offConn) r.offConn();
+    setTimeout(() => { FBNet.release(roomPath(r.code) + '/hub'); if (r.net) { r.net.close(); r.net.base.remove().catch(() => { }); } }, 500);
   }
   hideResult(); UI.resultFor = null;
   if (!silent) goHome();
@@ -917,7 +898,6 @@ function bind() {
 /* ---------- 시작 ---------- */
 (async function init() {
   buildBoard(); bind();
-  await loadTurn();
   if (DEMO) { myName = '선생님'; hdr(); goHome(); return; }
   $('#inName').value = myName;
   $('#inCode').value = qs.get('c') || localStorage.cgCode || '';

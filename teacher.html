@@ -6,8 +6,10 @@
 <title>좌표평면 오목 · 교사용</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=STIX+Two+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="turn-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="fbnet.js"></script>
 <script src="problems.js"></script>
 <style>
 :root{--ink:#16181c;--paper:#f7f5f0;--line:#dcd8cf;--muted:#6d6a64;--accent:#d2452f;--accent2:#1f4e8c;--ok:#1d7a46}
@@ -168,7 +170,7 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
 
 <script>
 'use strict';
-const APP_VER = 1, PREFIX = 'kgg-coordomok-';
+const APP_VER = 2;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mathify = s => esc(s).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>');
@@ -187,63 +189,77 @@ const S = Object.assign({
 }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
 function save() { try { localStorage.setItem(LS, JSON.stringify({ code: S.code, settings: S.settings, pause: S.pause, games: S.games, quiz: S.quiz, offline: S.offline })); } catch (e) { } }
 
-/* ---------- 연결 ---------- */
-let ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
-async function loadTurn() {
-  const c = window.TURN_CONFIG; if (!c || !c.app || !c.apiKey) return;
-  try { const r = await fetch(`https://${c.app}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(c.apiKey)}`); const l = await r.json(); if (Array.isArray(l)) ICE = ICE.concat(l); } catch (e) { }
-}
+/* ---------- 연결 : Firebase (fbnet.js) ----------
+   omok/{수업 코드}/hub 를 이 화면이 차지 → 학생은 up 으로 보내고, 이 화면은 dm(한 명)·down(모두)으로 보냄
+   학생 방(rooms/…)은 학생 기기끼리 Firebase를 거쳐 진행 — 이 화면을 닫아도 경기는 계속됨
+------------------------------------------------------------ */
 const students = new Map(); // dev -> {name, dev, conn, status, ver, last, on}
-let peer = null, failCount = 0;
-function startPeer() {
-  if (peer) try { peer.destroy(); } catch (e) { }
-  $('#code').textContent = S.code; $('#peerState').textContent = '수업 여는 중…';
-  peer = new Peer(PREFIX + 'class-' + S.code, { config: { iceServers: ICE }, debug: 0 });
-  peer.on('open', () => { $('#peerState').textContent = '🟢 수업이 열렸어요'; });
-  peer.on('connection', onConn);
-  peer.on('disconnected', () => { $('#peerState').textContent = '🟡 서버 다시 연결 중…'; try { peer.reconnect(); } catch (e) { } });
-  peer.on('error', e => {
-    if (e && e.type === 'unavailable-id') { $('#peerState').innerHTML = '🔴 이 코드가 이미 쓰이고 있어요 (다른 창에서 교사용 페이지가 열려 있나요?) <button class="btn sm" id="btnNewCode">새 코드</button>'; $('#btnNewCode').onclick = () => { S.code = String(1000 + Math.floor(Math.random() * 9000)); save(); startPeer(); }; }
-    else if (e && e.type !== 'peer-unavailable') $('#peerState').textContent = '🟡 연결 문제: ' + e.type;
-  });
+let hub = null, failCount = 0, hubOk = false, srvOn = false, openCode = null;
+const TAB = sessionStorage.tgTab || (sessionStorage.tgTab = 't' + Math.random().toString(36).slice(2, 10));
+const newCode = () => String(1000 + Math.floor(Math.random() * 9000));
+function peerState() {
+  if (!FBNet.ok) { $('#peerState').textContent = '🔴 연결 설정(firebase-config.js)이 없어요'; return; }
+  if (hubOk) $('#peerState').textContent = srvOn ? '🟢 수업이 열렸어요' : '🟡 인터넷 다시 연결 중… (학생 기록은 다시 연결되면 들어와요)';
 }
-function onConn(conn) {
-  let dev = null;
-  const t0 = setTimeout(() => { if (!dev) { failCount++; renderStudents(); } }, 12000);
-  conn.on('data', m => {
-    if (!m || !m.t) return;
-    if (m.t === 'hi') {
-      clearTimeout(t0);
-      dev = m.dev;
-      const old = students.get(dev);
-      if (old && old.conn && old.conn !== conn) try { old.conn.close(); } catch (e) { }
-      students.set(dev, { name: String(m.name || '학생').slice(0, 10), dev, conn, status: m.status || '', ver: m.ver, last: Date.now(), on: true });
-      S.offline = S.offline.filter(x => x !== dev);
-      conn.send({ t: 'sync', ver: APP_VER, settings: S.settings, pause: S.pause, quiz: publicQuiz() });
-      renderStudents();
+function startPeer() {
+  $('#code').textContent = S.code;
+  if (!FBNet.ok) { peerState(); return; }
+  if (hub) { hub.close(); hub = null; }
+  if (openCode && openCode !== S.code) FBNet.release('omok/' + openCode + '/hub');
+  hubOk = false; $('#peerState').textContent = '수업 여는 중…';
+  const code = S.code;
+  FBNet.claim('omok/' + code + '/hub', TAB).then(ok => {
+    if (code !== S.code) return;
+    if (!ok) {
+      $('#peerState').innerHTML = '🔴 이 코드가 이미 쓰이고 있어요 (다른 창에서 교사용 페이지가 열려 있나요?) <button class="btn sm" id="btnNewCode">새 코드</button>';
+      $('#btnNewCode').onclick = () => { S.code = newCode(); save(); students.clear(); renderStudents(); startPeer(); };
       return;
     }
-    const st = dev && students.get(dev); if (!st || st.conn !== conn) return;
-    st.last = Date.now();
-    switch (m.t) {
-      case 'ping': try { conn.send({ t: 'pong' }); } catch (e) { } break;
-      case 'status': st.status = m.status; renderStudents(); break;
-      case 'result': addGame(m); break;
-      case 'quizAns':
-        if (S.quiz && S.quiz.sent && !S.quiz.revealed && m.qid === S.quiz.qid && Number.isInteger(m.a) && m.a >= 0 && m.a < S.quiz.options.length) {
-          S.quiz.answers[st.name] = m.a; save(); renderQuiz();
-        }
-        break;
-    }
+    openCode = code; hubOk = true;
+    hub = FBNet.hub('omok/' + code, { onMsg: onStudentMsg, onPresence });
+    peerState();
   });
-  conn.on('close', () => { const st = dev && students.get(dev); if (st && st.conn === conn) { st.on = false; st.conn = null; renderStudents(); } });
 }
-setInterval(() => {
-  const now = Date.now(); let ch = false;
-  for (const st of students.values()) if (st.on && now - st.last > 12000) { st.on = false; try { st.conn.close(); } catch (e) { } st.conn = null; ch = true; }
-  if (ch) renderStudents();
-}, 4000);
-function broadcast(m) { for (const st of students.values()) if (st.on && st.conn) try { st.conn.send(m); } catch (e) { } }
+FBNet.onConnected(on => { srvOn = on; if (on && hubOk && openCode === S.code) FBNet.claim('omok/' + S.code + '/hub', TAB); peerState(); });
+const stuConn = dev => ({ send: m => { if (hub) hub.sendTo(dev, m); } });
+const syncMsg = () => ({ t: 'sync', ver: APP_VER, settings: S.settings, pause: S.pause, quiz: publicQuiz() });
+function onPresence(dev, on, info) {
+  let st = students.get(dev);
+  if (!st) {
+    if (!on) return;
+    st = { name: String(info.name || '학생').slice(0, 10), dev, conn: stuConn(dev), status: info.status || '', ver: info.ver, last: Date.now(), on: true };
+    students.set(dev, st); S.offline = S.offline.filter(x => x !== dev);
+    st.conn.send(syncMsg());
+  } else {
+    const was = st.on; st.on = on;
+    if (info) { if (info.name) st.name = String(info.name).slice(0, 10); if (info.status) st.status = info.status; if (info.ver) st.ver = info.ver; }
+    if (on && !was) { st.last = Date.now(); st.conn.send(syncMsg()); }
+  }
+  renderStudents();
+}
+function onStudentMsg(dev, m) {
+  if (!m || !m.t) return;
+  if (m.t === 'hi') {
+    const old = students.get(dev);
+    students.set(dev, { name: String(m.name || '학생').slice(0, 10), dev, conn: stuConn(dev), status: m.status || (old && old.status) || '', ver: m.ver, last: Date.now(), on: true });
+    S.offline = S.offline.filter(x => x !== dev);
+    students.get(dev).conn.send(syncMsg());
+    renderStudents();
+    return;
+  }
+  const st = students.get(dev); if (!st) return;
+  st.last = Date.now();
+  switch (m.t) {
+    case 'status': st.status = m.status; renderStudents(); break;
+    case 'result': addGame(m); break;
+    case 'quizAns':
+      if (S.quiz && S.quiz.sent && !S.quiz.revealed && m.qid === S.quiz.qid && Number.isInteger(m.a) && m.a >= 0 && m.a < S.quiz.options.length) {
+        S.quiz.answers[st.name] = m.a; save(); renderQuiz();
+      }
+      break;
+  }
+}
+function broadcast(m) { if (hub) hub.broadcast(m); }
 function onlineCount() { let c = 0; for (const s of students.values()) if (s.on) c++; return c; }
 
 /* ---------- 학생 목록 ---------- */
@@ -443,7 +459,6 @@ function bind() {
 
 (async function init() {
   bind(); renderControl(); renderStudents(); renderRecords();
-  await loadTurn();
   startPeer();
 })();
 </script>
