@@ -151,9 +151,11 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
       <div class="row" style="gap:24px">
         <div class="row"><b>방 만들기</b><label class="tg"><input type="checkbox" id="optQuad"> 👥 2:2 (4명)</label><label class="tg"><input type="checkbox" id="optDuo"> 🤺 1:1 (2명)</label><span class="sub">끄면 그 방식은 잠겨서 새 방을 못 만들어요 (이미 하는 판은 계속)</span></div>
         <div class="row"><b>몇 목</b><div class="seg" id="segN"><button data-n="4">4목</button><button data-n="5">5목</button></div></div>
+        <div class="row"><b>단계</b><div class="seg" id="segLv"><button data-v="low">하 · 제1사분면</button><button data-v="mid">중 · 네 사분면</button><button data-v="high">상 · 눈금 숫자 없이</button></div></div>
         <div class="row"><b>운 요소</b><div class="seg" id="segLuck"><button data-l="none">없음</button><button data-l="dice">🎲 사분면 주사위</button></div></div>
         <label class="tg"><input type="checkbox" id="optAlt"> 번갈아 부르기 (차례마다 조 안에서 역할 교대, 끄면 판마다)</label>
         <label class="tg"><input type="checkbox" id="optShow"> 찍는 사람 화면에 짝이 고른 좌표 보이기</label>
+        <label class="tg"><input type="checkbox" id="optRule"> 판이 끝나면 한 줄로 놓인 점들의 규칙 고르기</label>
         <label class="tg"><input type="checkbox" id="optPenalty"> 틀리게 찍으면 차례 잃기 (끄면 다시 찍기)</label>
         <label class="tg"><input type="checkbox" id="optCpu"> 2명 vs 컴퓨터 허용</label>
         <label class="tg"><input type="checkbox" id="optSolo"> 혼자 연습 허용</label>
@@ -219,7 +221,7 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
 
 <script>
 'use strict';
-const APP_VER = 7;
+const APP_VER = 8;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mathify = s => esc(s).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>');
@@ -238,8 +240,8 @@ const S = Object.assign({
   games: [], quiz: null, offline: [],
   pt: null, bal: {}, ptLog: [], run: {}, miss: [], helped: {}
 }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
-S.settings = Object.assign({ n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true }, S.settings);
-const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, bet: 0, streak: 3, refill: 10, earn: 2 };
+S.settings = Object.assign({ n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, S.settings);
+const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, rule: 2, bet: 0, streak: 3, refill: 10, earn: 2 };
 S.pt = Object.assign({}, PT_DEF, S.pt);
 ['bal', 'run', 'helped'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
 ['ptLog', 'miss'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
@@ -335,6 +337,7 @@ function onStudentMsg(dev, m) {
       }
       break;
     case 'miss': addMiss(st, m); break;
+    case 'rule': ruleAns(st, m); break;
     case 'earnReq': earnReq(st); break;
     case 'earnAns': earnAns(st, m); break;
   }
@@ -377,7 +380,7 @@ function renderStudents() {
 function addGame(m) {
   if (!m.gid || S.games.some(g => g.gid === m.gid)) return;
   const players = (m.players || []).slice(0, 4).map(p => ({ name: String(p.name).slice(0, 10), team: p.team === 'B' ? 'B' : 'A', role: ['c', 'p', 'cp'].includes(p.role) ? p.role : 'cp', calls: Math.max(0, p.calls | 0), ok: Math.max(0, p.ok | 0), bad: Math.max(0, p.bad | 0) }));
-  const g = { gid: String(m.gid), time: Date.now(), mode: MODE[m.mode] ? m.mode : 'online', n: m.n === 5 ? 5 : 4, winner: ['A', 'B', 'draw'].includes(m.winner) ? m.winner : 'draw', moves: m.moves | 0, players, cpuTeam: m.cpuTeam || null };
+  const g = { gid: String(m.gid), time: Date.now(), mode: MODE[m.mode] ? m.mode : 'online', n: m.n === 5 ? 5 : 4, winner: ['A', 'B', 'draw'].includes(m.winner) ? m.winner : 'draw', moves: m.moves | 0, players, cpuTeam: m.cpuTeam || null, dir: [0, 1, 2, 3].includes(m.dir) ? m.dir : null, level: ['low', 'mid', 'high'].includes(m.level) ? m.level : 'mid' };
   S.games.push(g);
   awardGame(g);
   save(); renderRecords(); renderStudents(); renderPoints();
@@ -401,11 +404,11 @@ const stamp = () => new Date().toISOString().slice(0, 10);
 
 /* ---------- 포인트 (장부는 이 화면이 원본) ---------- */
 const PT_FIELDS = [
-  ['start', '처음 지급', 0, 1000], ['place', '맞게 찍기 1번', 0, 10], ['win', '대전 승리 (2:2·1:1, 한 사람당)', 0, 50], ['draw', '대전 무승부', 0, 50],
-  ['cpuWin', '컴퓨터 이기기', 0, 50], ['quiz', '좌표 퀴즈 정답', 0, 50], ['bet', '판돈 (0이면 안 걺)', 0, 100], ['streak', '같은 사람들 연속 제한(판)', 1, 20],
+  ['start', '처음 지급', 0, 1000], ['place', '맞게 찍기·1:1 좌표 맞히기 1번', 0, 10], ['win', '대전 승리 (2:2·1:1, 한 사람당)', 0, 50], ['draw', '대전 무승부', 0, 50],
+  ['cpuWin', '컴퓨터 이기기', 0, 50], ['quiz', '좌표 퀴즈 정답', 0, 50], ['rule', '판 끝 규칙 고르기 정답', 0, 20], ['bet', '판돈 (0이면 안 걺)', 0, 100], ['streak', '같은 사람들 연속 제한(판)', 1, 20],
   ['refill', '충전 문제: 이 점수보다 적으면', 0, 1000], ['earn', '충전 문제 1개', 0, 20]
 ];
-const publicPt = () => ({ on: S.pt.on, bet: S.pt.bet, place: S.pt.place, win: S.pt.win, draw: S.pt.draw, cpuWin: S.pt.cpuWin, quiz: S.pt.quiz, refill: S.pt.refill, earn: S.pt.earn, streak: S.pt.streak });
+const publicPt = () => ({ on: S.pt.on, bet: S.pt.bet, place: S.pt.place, win: S.pt.win, draw: S.pt.draw, cpuWin: S.pt.cpuWin, quiz: S.pt.quiz, rule: S.pt.rule, refill: S.pt.refill, earn: S.pt.earn, streak: S.pt.streak });
 function bal(name) { if (!(name in S.bal)) S.bal[name] = S.pt.start; return S.bal[name]; }
 function addPts(name, d, why) {
   if (!d) return;
@@ -503,11 +506,21 @@ function renderBigPts() {
 }
 
 /* ---------- 도울 학생 (찍기 실수) ---------- */
+/* 판 끝 규칙 고르기: 결과를 보낸 판(gid)의 선수만, 한 번만 */
+function ruleAns(st, m) {
+  const g = S.games.find(x => x.gid === m.gid);
+  if (!g || g.dir == null || !g.players.some(p => p.name === st.name)) return;
+  g.ruled = g.ruled || {};
+  if (st.name in g.ruled) return;
+  const ok = m.a === g.dir; g.ruled[st.name] = ok;
+  if (ok && S.pt.on && S.pt.rule) { const d = addPts(st.name, S.pt.rule, '규칙 고르기 정답'); notify(st.name, d, '규칙 고르기 정답'); }
+  save(); renderPoints(); renderStudents();
+}
 function addMiss(st, m) {
   const s = m.said, t = m.tapped;
   if (!s || !t || ![s.x, s.y, t.x, t.y].every(Number.isInteger)) return;
   if (m.id && S.miss.some(x => x.id === m.id && x.name === st.name)) return;
-  S.miss.push({ id: m.id || null, time: Date.now(), name: st.name, said: { x: s.x, y: s.y }, tapped: { x: t.x, y: t.y }, type: CoordKit.missType(s, t) });
+  S.miss.push({ id: m.id || null, time: Date.now(), name: st.name, said: { x: s.x, y: s.y }, tapped: { x: t.x, y: t.y }, type: CoordKit.missType(s, t), kind: m.kind === 'read' ? 'read' : 'plot' });
   if (S.miss.length > 3000) S.miss.splice(0, S.miss.length - 3000);
   save(); renderHelp();
 }
@@ -527,7 +540,7 @@ function renderHelp() {
     const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
     const on = devsOf(name).length > 0;
     return `<div class="help"><div class="nm">${esc(name)} <span class="badge ${on ? 'on' : 'off'}">${on ? '연결됨' : '끊김'}</span> <span class="badge warn">찍기 실수 ${l.length}번</span></div><button class="btn sm" data-helped="${esc(name)}">✓ 도왔어요</button>
-      <div class="ms m">${l.slice(-4).map(x => `말한 ${P2(x.said)} → 찍은 ${P2(x.tapped)} <span style="font-family:'Noto Sans KR'">(${CoordKit.MISS[x.type].name})</span>`).join(' · ')}</div>
+      <div class="ms m">${l.slice(-4).map(x => (x.kind === 'read' ? `점 ${P2(x.said)} → 읽은 ${P2(x.tapped)}` : `말한 ${P2(x.said)} → 찍은 ${P2(x.tapped)}`) + ` <span style="font-family:'Noto Sans KR'">(${CoordKit.MISS[x.type].name})</span>`).join(' · ')}</div>
       <div class="tp">가장 많은 실수: <b>${CoordKit.MISS[top].name}</b> — ${esc(CoordKit.MISS[top].tip)}</div></div>`;
   }).join('') || '<p class="sub">지금은 도울 학생이 없어요. 👍</p>';
   const today = todayStr(Date.now()), cnt = {}; let tot = 0;
@@ -540,6 +553,8 @@ function renderControl() {
   $$('#segN button').forEach(b => b.classList.toggle('on', Number(b.dataset.n) === S.settings.n));
   if (S.settings.luck !== 'dice') S.settings.luck = 'none';
   $$('#segLuck button').forEach(b => b.classList.toggle('on', b.dataset.l === S.settings.luck));
+  $$('#segLv button').forEach(b => b.classList.toggle('on', b.dataset.v === S.settings.level));
+  $('#optRule').checked = S.settings.rule !== false;
   $('#optQuad').checked = S.settings.quad !== false; $('#optDuo').checked = S.settings.duo !== false;
   $('#optThick').checked = !!S.settings.thick; $('#btnThick').classList.toggle('pri', !!S.settings.thick);
   $('#optPenalty').checked = S.settings.penalty; $('#optAlt').checked = S.settings.alt; $('#optShow').checked = S.settings.showCall; $('#optCpu').checked = S.settings.cpu; $('#optSolo').checked = S.settings.solo;
@@ -622,6 +637,8 @@ function bind() {
   $('#big').onclick = () => $('#big').classList.add('hidden');
   $$('#segN button').forEach(b => b.onclick = () => { S.settings.n = Number(b.dataset.n); pushSettings(); });
   $$('#segLuck button').forEach(b => b.onclick = () => { S.settings.luck = b.dataset.l; pushSettings(); });
+  $$('#segLv button').forEach(b => b.onclick = () => { S.settings.level = b.dataset.v; pushSettings(); if (b.dataset.v === 'low' && S.settings.luck === 'dice') toast('하 단계에서는 사분면 주사위를 쓰지 않아요'); });
+  $('#optRule').onchange = e => { S.settings.rule = e.target.checked; pushSettings(); };
   $('#optPenalty').onchange = e => { S.settings.penalty = e.target.checked; pushSettings(); };
   $('#optAlt').onchange = e => { S.settings.alt = e.target.checked; pushSettings(); };
   $('#optShow').onchange = e => { S.settings.showCall = e.target.checked; pushSettings(); };
