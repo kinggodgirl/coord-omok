@@ -12,16 +12,17 @@
   function planeSVG(o) {
     const r = o.r, c = o.cell, m = o.margin, fs = o.fs || 22;
     const C = m + r * c, X = x => C + x * c, Y = y => C - y * c;
-    const lw = Math.max(1.6, c / 24);
+    const th = o.thick ? 1.9 : 1;   // 프로젝터용 굵은 선
+    const lw = Math.max(1.6, c / 24) * th;
     let s = '', lab = '';
     if (o.grid !== false) {
-      s += `<g stroke="#c9c9c9" stroke-width="${Math.max(1, c / 45).toFixed(2)}">`;
+      s += `<g stroke="${o.thick ? '#9a9a9a' : '#c9c9c9'}" stroke-width="${(Math.max(1, c / 45) * (o.thick ? 1.8 : 1)).toFixed(2)}">`;
       for (let i = -r; i <= r; i++) {
         s += `<line x1="${X(i)}" y1="${Y(-r)}" x2="${X(i)}" y2="${Y(r)}"/><line x1="${X(-r)}" y1="${Y(i)}" x2="${X(r)}" y2="${Y(i)}"/>`;
       }
       s += '</g>';
     }
-    const ext = c * 0.62, ah = c * 0.3, aw = c * 0.13;
+    const ext = c * 0.62, ah = c * 0.3 * (o.thick ? 1.25 : 1), aw = c * 0.13 * (o.thick ? 1.25 : 1);
     const tx = X(r) + ext, ty = Y(r) - ext;
     s += `<g stroke="#111" stroke-width="${lw}" fill="none" stroke-linecap="butt">` +
       `<line x1="${X(-r) - c * 0.4}" y1="${C}" x2="${tx - ah * 0.5}" y2="${C}"/>` +
@@ -47,13 +48,13 @@
   }
 
   /* 퀴즈 그림 (점 + 이름표). 점 이름은 정자체 */
-  function quizFigSVG(fig) {
+  function quizFigSVG(fig, thick) {
     const r = fig.r || 5, c = 38, m = 46, fs = 22, size = m * 2 + c * 2 * r, C = m + r * c;
     let s = `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img">` +
-      `<rect width="${size}" height="${size}" fill="#fff"/>` + planeSVG({ r, cell: c, margin: m, fs });
+      `<rect width="${size}" height="${size}" fill="#fff"/>` + planeSVG({ r, cell: c, margin: m, fs, thick });
     (fig.pts || []).forEach(p => {
       const x = C + p.x * c, y = C - p.y * c;
-      s += `<circle cx="${x}" cy="${y}" r="5.5" fill="#111"/>`;
+      s += `<circle cx="${x}" cy="${y}" r="${thick ? 7.5 : 5.5}" fill="#111"/>`;
       const dx = p.x < 0 ? -1 : 1, dy = p.y < 0 ? 1 : -1;
       if (p.label) s += `<text ${FONT} x="${x + dx * 9}" y="${y + dy * 9 + (dy > 0 ? fs * 0.8 : 0)}" text-anchor="${dx < 0 ? 'end' : 'start'}" font-size="${fs * 1.2}" fill="#111" stroke="#fff" stroke-width="5" paint-order="stroke">${p.label}</text>`;
     });
@@ -106,5 +107,31 @@
     return { type: 'quad', q: `점 ${pt(a, b)}은 어디에 있는지 고르시오.`, fig: null, options, answer: options.indexOf(name), explain };
   }
 
-  window.CoordKit = { fmt, pt, planeSVG, quizFigSVG, makeQuiz, TYPES, MINUS };
+  /* 찍기 실수 유형: 말한 좌표 s, 찍은 좌표 t */
+  const MISS = {
+    swap: { name: 'x·y 바꿈', tip: 'x좌표와 y좌표를 서로 바꿔 찍었어요. 순서쌍은 (x좌표, y좌표) — 앞의 수가 가로(x축) 방향이에요.' },
+    signx: { name: 'x 부호 반대', tip: 'x좌표의 부호를 반대로 찍었어요. x좌표가 양수면 오른쪽, 음수면 왼쪽이에요.' },
+    signy: { name: 'y 부호 반대', tip: 'y좌표의 부호를 반대로 찍었어요. y좌표가 양수면 위쪽, 음수면 아래쪽이에요.' },
+    signxy: { name: '두 부호 반대', tip: 'x좌표와 y좌표의 부호를 모두 반대로 찍었어요. 원점 O에서 어느 쪽으로 가는지 부호를 먼저 보세요.' },
+    near: { name: '한 칸 어긋남', tip: '한 칸 어긋났어요. 원점 O에서부터 눈금을 하나씩 세어 보세요.' },
+    other: { name: '다른 곳', tip: '말한 좌표와 많이 다른 곳이에요. 짝에게 좌표를 다시 또박또박 말해 달라고 해 보세요.' }
+  };
+  function missType(s, t) {
+    if (t.x === s.y && t.y === s.x && s.x !== s.y) return 'swap';
+    if (t.x === -s.x && t.y === s.y && s.x !== 0) return 'signx';
+    if (t.y === -s.y && t.x === s.x && s.y !== 0) return 'signy';
+    if (t.x === -s.x && t.y === -s.y && s.x !== 0 && s.y !== 0) return 'signxy';
+    if (Math.max(Math.abs(t.x - s.x), Math.abs(t.y - s.y)) === 1) return 'near';
+    return 'other';
+  }
+  /* 이름을 '번호 이름' 꼴로: "7김민지", "07번 김 민지" → "7 김민지". 번호가 없으면 null */
+  function normName(raw) {
+    const m = String(raw || '').trim().match(/^(\d{1,2})\s*번?\s*(.+)$/);
+    if (!m) return null;
+    const nm = m[2].replace(/\s+/g, '').slice(0, 8);
+    if (!nm) return null;
+    return (+m[1]) + ' ' + nm;
+  }
+
+  window.CoordKit = { fmt, pt, planeSVG, quizFigSVG, makeQuiz, TYPES, MINUS, MISS, missType, normName };
 })();
