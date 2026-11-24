@@ -215,7 +215,8 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
         <li><b>찍는 사람</b>은 들은 좌표의 점을 찾아 찍어요. <span id="ruleShow">(찍는 사람 화면에도 짝이 고른 좌표가 떠요.)</span> 말한 좌표와 다른 곳에 찍으면 ✗ — <b id="ruleP">차례를 잃어요</b>.</li>
         <li>먼저 돌 <b id="ruleN">4</b>개를 한 줄로(가로·세로·대각선) 놓는 조가 이겨요.</li>
         <li id="ruleLuck" class="hidden"></li>
-        <li id="ruleDuo"><b>🤺 1:1 대전</b>: 두 사람이 번갈아 놓고 싶은 자리의 <b>좌표</b>를 골라요. 고른 좌표에 바로 돌이 놓이니, 좌표를 정확히 읽어야 해요.</li>
+        <li id="ruleDuo"><b>🤺 1:1 대전</b>: 두 사람이 번갈아 판에서 <b>점</b>을 누르고 그 점의 <b>좌표</b>를 골라요. 좌표가 맞아야 돌이 놓이고, 틀리면 차례를 잃어요.</li>
+        <li id="ruleLv"></li>
         <li id="ruleAlt"><b>번갈아 부르기</b>: 우리 조 차례가 끝날 때마다 말하는 사람과 찍는 사람이 서로 바뀌어요.</li>
       </ol>
     </div>
@@ -284,7 +285,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 
 <script>
 'use strict';
-const APP_VER = 7, R = 5;
+const APP_VER = 8, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -300,7 +301,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const DEV = sessionStorage.cgDev || (sessionStorage.cgDev = 'd' + Math.random().toString(36).slice(2, 10));
 const rid = () => Date.now() + Math.random();
 
-const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true }, paused: false, classOk: false, quiz: null, status: '', pt: null, bal: null, earn: null };
+const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, paused: false, classOk: false, quiz: null, status: '', pt: null, bal: null, earn: null };
 let myName = localStorage.cgName || '';
 
 /* ---------- 화면 공통 ---------- */
@@ -475,6 +476,8 @@ function refreshHome() {
   $('#btnCreate').textContent = quadOk ? '👥 2:2 방 만들기 (4명)' : '🔒 2:2 방 (선생님이 잠금)';
   $('#btnDuo').textContent = duoOk ? '🤺 1:1 방 만들기 (2명)' : '🔒 1:1 방 (선생님이 잠금)';
   $('#ruleDuo').classList.toggle('hidden', !duoOk);
+  const lv = lvOf();
+  $('#ruleLv').innerHTML = `<b>단계: ${LEVELS[lv]}</b> — ` + (lv === 'low' ? '제1사분면과 축 위의 점(좌표가 0~5)만 써요.' : lv === 'high' ? '좌표평면에 눈금 숫자가 없어요. 원점 O에서 눈금을 세어 보세요.' : '네 사분면을 모두 써요.');
   $('#btnCpu2').disabled = !ok; $('#btnCpu2').classList.toggle('hidden', !ST.settings.cpu);
   $('#btnSolo').classList.toggle('hidden', !DEMO && (!ST.settings.solo || !ok));
   const P = ST.pt, pon = ptOn() && !DEMO && ST.bal != null;
@@ -495,7 +498,11 @@ function refreshHome() {
 }
 
 /* ---------- 게임 엔진 (방장 기기 / 혼자 모드에서만 실행) ---------- */
-function applyRules(E) { E.n = ST.settings.n; E.penalty = ST.settings.penalty; E.luck = ST.settings.luck === 'dice' ? 'dice' : 'none'; E.alt = ST.settings.alt !== false; E.showCall = ST.settings.showCall !== false; }
+/* 단계: 하(low) 제1사분면과 축(0~5)만 · 중(mid) 네 사분면 · 상(high) 네 사분면 + 눈금 숫자 없음 */
+const LEVELS = { low: '하 · 제1사분면', mid: '중 · 네 사분면', high: '상 · 눈금 숫자 없이' };
+const lvOf = () => (LEVELS[ST.settings.level] ? ST.settings.level : 'mid');
+const inLv = (lv, x, y) => lv !== 'low' || (x >= 0 && y >= 0);
+function applyRules(E) { E.level = lvOf(); E.n = ST.settings.n; E.penalty = ST.settings.penalty; E.luck = ST.settings.luck === 'dice' && E.level !== 'low' ? 'dice' : 'none'; E.alt = ST.settings.alt !== false; E.showCall = ST.settings.showCall !== false; }
 function humanTeam(E, t) { return t !== E.cpuTeam && !(E.autoPlace && t === 'A'); }
 const oneSeat = v => !!(v.autoPlace || v.duo);   // 찍는 사람 없이 고른 좌표에 바로 놓는 판 (혼자 연습, 1:1)
 function swapTeam(E, t) { if (!humanTeam(E, t) || E.duo) return; const c = E.seats[t + 'c'], p = E.seats[t + 'p']; E.seats[t + 'c'] = p; E.seats[t + 'p'] = c; }
@@ -505,7 +512,7 @@ function pst(E, seat) {
 }
 function mkEngine(o) {
   return {
-    luck: ST.settings.luck === 'dice' ? 'dice' : 'none', zone: 'free', die: null,
+    level: lvOf(), luck: ST.settings.luck === 'dice' && lvOf() !== 'low' ? 'dice' : 'none', zone: 'free', die: null,
     code: o.code || '', mode: o.mode, n: o.n || 4, penalty: o.penalty !== false, alt: ST.settings.alt !== false, showCall: ST.settings.showCall !== false, cpuTeam: o.cpuTeam || null, autoPlace: !!o.autoPlace, duo: !!o.duo,
     seats: { Ac: null, Ap: null, Bc: null, Bp: null }, members: [], board: {}, turn: 'A', first: 'A', phase: 'lobby',
     secret: null, log: [], stats: {}, winner: null, line: null, ev: null, round: 0, moves: 0, last: null, gid: null, reported: false
@@ -541,7 +548,8 @@ function inZone(z, x, y) {
   if (x === 0 || y === 0) return false;
   return z === (x > 0 ? (y > 0 ? 'q1' : 'q4') : (y > 0 ? 'q2' : 'q3'));
 }
-function zoneHasEmpty(E, z) { for (let x = -R; x <= R; x++) for (let y = -R; y <= R; y++) if (!E.board[K(x, y)] && inZone(z, x, y)) return true; return false; }
+function zoneHasEmpty(E, z) { for (let x = -R; x <= R; x++) for (let y = -R; y <= R; y++) if (!E.board[K(x, y)] && inZone(z, x, y) && inLv(E.level, x, y)) return true; return false; }
+const spots = E => (E.level === 'low' ? (R + 1) ** 2 : (2 * R + 1) ** 2);
 function startTurn(E) {
   E.secret = null; E.die = null;
   if (E.luck === 'dice') { E.phase = 'roll'; E.zone = null; return; }
@@ -552,7 +560,7 @@ function ePut(E, team, x, y) {   // 돌을 놓고 끝났으면 true
   E.board[K(x, y)] = team; E.moves++; E.last = { x, y }; E.log.push({ team, x, y, ok: true }); E.secret = null;
   const line = checkWin(E.board, x, y, team, E.n);
   if (line) { E.phase = 'over'; E.winner = team; E.line = line; return true; }
-  if (Object.keys(E.board).length >= (2 * R + 1) ** 2) { E.phase = 'over'; E.winner = 'draw'; return true; }
+  if (Object.keys(E.board).length >= spots(E)) { E.phase = 'over'; E.winner = 'draw'; return true; }
   return false;
 }
 function afterFirst(E, team, x, y) {     // 맞게 놓은 뒤: 끝났는지 보고 차례 넘기기
@@ -572,9 +580,23 @@ function eCall(E, seat, x, y) {
   if (!inR(x, y)) return 'range';
   if (E.board[K(x, y)]) return 'taken';
   if (!inZone(E.zone, x, y)) return 'zone';
+  if (!inLv(E.level, x, y)) return 'level';
+  if (E.duo) return 'notyou';      // 1:1은 eRead로 (점 누르고 좌표 고르기)
   pst(E, seat).calls++;
   if (oneSeat(E)) { E.ev = { id: rid(), kind: 'put', team: E.turn, x, y }; afterFirst(E, E.turn, x, y); return 'ok'; }
   E.secret = { x, y }; E.phase = 'place'; E.ev = null; return 'ok';
+}
+/* 1:1: 판에서 점(px, py)을 누르고 그 점의 좌표 (x, y)를 골라야 놓임 — 점 → 좌표 */
+function eRead(E, seat, px, py, x, y) {
+  if (!E.duo || E.phase !== 'call' || seat !== E.turn + 'c') return 'notyou';
+  if (!inR(px, py) || !inR(x, y) || E.board[K(px, py)] || !inZone(E.zone, px, py) || !inLv(E.level, px, py)) return 'bad';
+  const team = E.turn; pst(E, seat).calls++;
+  if (px === x && py === y) { pst(E, seat).ok++; E.ev = { id: rid(), kind: 'put', team, x, y }; afterFirst(E, team, x, y); return 'ok'; }
+  pst(E, seat).bad++;
+  E.log.push({ team, x: px, y: py, tx: x, ty: y, ok: false, read: true });
+  E.ev = { id: rid(), kind: 'wrong', read: true, team, said: { x: px, y: py }, tapped: { x, y }, pass: E.penalty, by: E.seats[seat] ? E.seats[seat].dev : null, miss: CoordKit.missType({ x: px, y: py }, { x, y }) };
+  if (E.penalty) endTurn(E, team);
+  return 'wrong';
 }
 function ePlace(E, seat, x, y) {
   if (E.phase !== 'place' || seat !== E.turn + 'p' || !E.secret) return 'notyou';
@@ -606,11 +628,11 @@ function lineScore(b, x, y, t, n) {
   }
   return tot;
 }
-function cpuPick(b, n, me, zone) {
+function cpuPick(b, n, me, zone, lv) {
   const opp = other(me); let best = null, bs = -1;
-  if (!Object.keys(b).length && (!zone || zone === 'free')) return { x: Math.floor(Math.random() * 3) - 1, y: Math.floor(Math.random() * 3) - 1 };
+  if (!Object.keys(b).length && (!zone || zone === 'free')) return lv === 'low' ? { x: 2 + Math.floor(Math.random() * 2), y: 2 + Math.floor(Math.random() * 2) } : { x: Math.floor(Math.random() * 3) - 1, y: Math.floor(Math.random() * 3) - 1 };
   for (let x = -R; x <= R; x++) for (let y = -R; y <= R; y++) {
-    if (b[K(x, y)] || !inZone(zone, x, y)) continue;
+    if (b[K(x, y)] || !inZone(zone, x, y) || !inLv(lv, x, y)) continue;
     const s = lineScore(b, x, y, me, n) * 1.15 + lineScore(b, x, y, opp, n) + (R - Math.max(Math.abs(x), Math.abs(y))) * 0.4 + Math.random() * 3;
     if (s > bs) { bs = s; best = { x, y }; }
   }
@@ -620,7 +642,7 @@ function eCpu(E) {
   if (E.turn !== E.cpuTeam) return;
   if (E.phase === 'roll') { eRoll(E, null); return; }
   if (E.phase !== 'call') return;
-  const m = cpuPick(E.board, E.n, E.turn, E.zone);
+  const m = cpuPick(E.board, E.n, E.turn, E.zone, E.level);
   if (!m) { endTurn(E, E.turn); return; }
   E.ev = { id: rid(), kind: 'put', team: E.turn, x: m.x, y: m.y };
   afterFirst(E, E.turn, m.x, m.y);
@@ -634,7 +656,7 @@ function viewFor(E, mine) {
     mode: E.mode, code: E.code, n: E.n, penalty: E.penalty, alt: E.alt, showCall: E.showCall, cpuTeam: E.cpuTeam, autoPlace: E.autoPlace, duo: E.duo, seats: E.seats, members: E.members,
     board: E.board, turn: E.turn, phase: E.phase, log: E.log.slice(-60), stats: E.stats, winner: E.winner, line: E.line, ev: E.ev,
     round: E.round, moves: E.moves, last: E.last,
-    luck: E.luck, zone: E.zone, die: E.die
+    luck: E.luck, zone: E.zone, die: E.die, level: E.level, gid: E.gid
   };
   const placing = E.phase === 'place';
   if (placing && mine.includes(E.turn + 'c') && !mine.includes(E.turn + 'p')) v.secret = E.secret;
@@ -667,6 +689,7 @@ function hostAct(dev, a) {
     case 'call': { const s = E.turn + 'c'; if (mine.includes(s)) eCall(E, s, a.x, a.y); break; }
     case 'roll': { const s = E.turn + 'c'; if (mine.includes(s)) eRoll(E, s); break; }
     case 'place': { const s = E.turn + 'p'; if (mine.includes(s)) ePlace(E, s, a.x, a.y); break; }
+    case 'read': { const s = E.turn + 'c'; if (mine.includes(s)) eRead(E, s, a.px, a.py, a.x, a.y); break; }
     case 'again': if (E.phase === 'over' && mine.length && ready(E)) { applyRules(E); eAgain(E); } break;
     case 'lobby': if (dev === DEV && E.phase === 'over') E.phase = 'lobby'; break;
   }
@@ -697,7 +720,7 @@ function update() {
 function reportResult(E) {
   if (DEMO || E.mode === 'demo') return;
   const players = Object.values(E.stats).map(p => ({ name: p.name, team: p.team, role: p.calls && (p.ok + p.bad) ? 'cp' : (p.calls ? 'c' : 'p'), calls: p.calls, ok: p.ok, bad: p.bad }));
-  sendT({ t: 'result', gid: E.gid, mode: E.mode, n: E.n, winner: E.winner, moves: E.moves, players, cpuTeam: E.cpuTeam });
+  sendT({ t: 'result', gid: E.gid, mode: E.mode, n: E.n, winner: E.winner, moves: E.moves, players, cpuTeam: E.cpuTeam, dir: E.line ? lineDir(E.line) : null, level: E.level });
 }
 
 /* 방: omok/{수업 코드}/rooms/{방 코드}/… — 방장 기기가 hub를 차지하고 게임 엔진을 돌림 */
@@ -803,9 +826,7 @@ const UI = { key: null, sel: null, cx: null, cy: null, flashId: null, flash: nul
 function buildBoard() {
   const b = $('#board'); b.setAttribute('viewBox', `0 0 ${SZ} ${SZ}`);
   const bg = $('#bg'); bg.setAttribute('width', SZ); bg.setAttribute('height', SZ);
-  const thick = !!ST.settings.thick;
-  $('#plane').innerHTML = CoordKit.planeSVG({ r: R, cell: CELL, margin: MG, fs: thick ? 31 : 27, part: 'base', thick });
-  $('#planeLab').innerHTML = CoordKit.planeSVG({ r: R, cell: CELL, margin: MG, fs: thick ? 31 : 27, part: 'labels', thick });
+  drawPlane(UI.planeLv || 'mid');
   if (UI.boardBuilt) return;
   UI.boardBuilt = true;
   ['x', 'y'].forEach(ax => {
@@ -817,6 +838,13 @@ function buildBoard() {
       UI['c' + ax] = Number(bt.dataset.v); render();
     });
   });
+}
+function drawPlane(lv) {
+  const thick = !!ST.settings.thick;
+  UI.planeLv = lv; UI.planeKey = thick + '|' + lv;
+  const o = { r: R, cell: CELL, margin: MG, fs: thick ? 31 : 27, thick, numbers: lv !== 'high' };
+  $('#plane').innerHTML = CoordKit.planeSVG(Object.assign({ part: 'base' }, o));
+  $('#planeLab').innerHTML = CoordKit.planeSVG(Object.assign({ part: 'labels' }, o));
 }
 function render() {
   if (!room) return;
@@ -830,8 +858,8 @@ function renderLobby(v, mine) {
   const isHost = room.kind === 'host';
   $('#lbCode').textContent = v.code;
   $('#lbHint').textContent = v.mode === 'cpu2' ? '짝에게 알려 주세요 (2명)' : v.duo ? '상대에게 알려 주세요 (1:1, 2명)' : '친구들에게 알려 주세요 (4명)';
-  if (v.duo) $('#lbInfo').textContent = `🤺 1:1 대전 · ${v.n}목 · 차례마다 좌표를 골라 바로 놓아요${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
-  else $('#lbInfo').textContent = `이번 판: ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'}${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet && v.mode === 'online' ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
+  if (v.duo) $('#lbInfo').textContent = `🤺 1:1 대전 · ${LEVELS[v.level] || ''} · ${v.n}목 · 점을 누르고 그 점의 좌표를 맞혀야 놓여요${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
+  else $('#lbInfo').textContent = `이번 판: ${LEVELS[v.level] || ''} · ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'}${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet && v.mode === 'online' ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
   let h = '';
   ['A', 'B'].forEach(t => {
     h += `<div class="card team"><h3>${stoneHTML(t)} ${v.duo ? (t === 'A' ? '흑돌' : '백돌') : TEAM[t]}</h3>`;
@@ -863,11 +891,11 @@ function renderGame(v, mine) {
   if (v.ev && v.ev.id !== UI.flashId) {
     UI.flashId = v.ev.id;
     if (v.ev.kind === 'wrong') {
-      const mineMiss = v.ev.by === DEV && v.mode !== 'demo' && !oneSeat(v);
+      const mineMiss = v.ev.by === DEV && v.mode !== 'demo' && !v.autoPlace;
       const mt = CoordKit.MISS[v.ev.miss];
       UI.flash = { ev: v.ev, until: Date.now() + (mineMiss ? 6000 : 3800) };
-      wrongMsg = [`✗ ${TEAM[v.ev.team]}: 말한 좌표 ${P(v.ev.said.x, v.ev.said.y)}와 다른 곳에 찍었어요!` + (v.ev.pass ? ' 차례가 넘어가요.' : ' 다시 찍으세요.') + (mt ? (mineMiss ? '\n💡 ' + mt.tip : ` (${mt.name})`) : ''), mineMiss ? 6000 : 3800];
-      if (mineMiss) sendT({ t: 'miss', id: String(v.ev.id), said: v.ev.said, tapped: v.ev.tapped });
+      wrongMsg = [(v.ev.read ? `✗ ${TEAM[v.ev.team]}: 점 ${P(v.ev.said.x, v.ev.said.y)}의 좌표를 ${P(v.ev.tapped.x, v.ev.tapped.y)}(으)로 골랐어요!` : `✗ ${TEAM[v.ev.team]}: 말한 좌표 ${P(v.ev.said.x, v.ev.said.y)}와 다른 곳에 찍었어요!`) + (v.ev.pass ? ' 차례가 넘어가요.' : ' 다시 찍으세요.') + (mt ? (mineMiss ? '\n💡 ' + mt.tip : ` (${mt.name})`) : ''), mineMiss ? 6000 : 3800];
+      if (mineMiss) sendT({ t: 'miss', id: String(v.ev.id), said: v.ev.said, tapped: v.ev.tapped, kind: v.ev.read ? 'read' : 'plot' });
       setTimeout(() => { if (room) render(); }, mineMiss ? 6100 : 3900);
     } else if (v.ev.kind === 'left') toast(`${v.ev.name}의 연결이 끊겼어요. 다시 들어오면 이어서 해요.`, true, 3500);
     else if (v.ev.kind === 'put') UI.popId = v.ev.id;
@@ -880,8 +908,12 @@ function renderGame(v, mine) {
   }
   if (wrongMsg) toast(wrongMsg[0], true, wrongMsg[1]);
   UI.mineKey = mineKey; UI.mineRound = v.round;
+  const lv = v.level || 'mid';
+  if (UI.planeKey !== !!ST.settings.thick + '|' + lv) drawPlane(lv);
+  $$('.nums button').forEach(b => b.classList.toggle('hidden', lv === 'low' && Number(b.dataset.v) < 0));
   const t = v.turn, cpuTurn = v.cpuTeam === t;
   const iCall = mine.includes(t + 'c'), iPlace = mine.includes(t + 'p');
+  const readMode = !!v.duo && v.phase === 'call' && iCall && !cpuTurn;
   let instr = '', showCall = false, showPlace = false;
   const over = v.phase === 'over';
   if (over) instr = v.winner === 'draw' ? '판이 가득 찼어요. 무승부!' : `${TEAM[v.winner]}가 ${v.n}개를 한 줄로 놓았어요!`;
@@ -890,7 +922,9 @@ function renderGame(v, mine) {
   else if (v.phase === 'roll') {
     instr = iCall ? '<b>나는 말하는 사람</b> — 먼저 주사위를 굴려 이번에 둘 수 있는 곳을 정해요.' : `${TEAM[t]} 차례 — 말하는 사람이 주사위를 굴리는 중이에요.`;
   } else if (v.phase === 'call') {
-    if (iCall) { showCall = true; instr = oneSeat(v) ? '놓고 싶은 자리를 정하고 그 자리의 <b>좌표</b>를 고르세요. 고른 좌표에 바로 돌이 놓여요.' : '<b>나는 말하는 사람</b> — 돌을 놓고 싶은 자리를 정하고, 그 자리의 <b>좌표</b>를 고르세요.'; }
+    if (readMode) { showCall = true; instr = '🤺 판에서 돌을 놓을 <b>점</b>을 누르고, 그 점의 <b>좌표</b>를 고르세요. 좌표가 맞아야 돌이 놓여요!'; }
+    else if (v.duo) instr = `${TEAM[t]} 차례 — 상대가 점을 누르고 그 점의 좌표를 고르는 중이에요. 판이 바뀌면 상대가 맞게 읽었는지 확인해 보세요.`;
+    else if (iCall) { showCall = true; instr = oneSeat(v) ? '놓고 싶은 자리를 정하고 그 자리의 <b>좌표</b>를 고르세요. 고른 좌표에 바로 돌이 놓여요.' : '<b>나는 말하는 사람</b> — 돌을 놓고 싶은 자리를 정하고, 그 자리의 <b>좌표</b>를 고르세요.'; }
     else if (iPlace) instr = '짝(말하는 사람)이 좌표를 고르는 중이에요. 잠시 기다리세요.';
     else instr = `${TEAM[t]} 차례 — 말하는 사람이 좌표를 고르는 중이에요.`;
   } else if (v.phase === 'place') {
@@ -909,12 +943,22 @@ function renderGame(v, mine) {
     $$('.nums button').forEach(b => { const ax = b.parentElement.dataset.axis; b.classList.toggle('on', UI['c' + ax] === Number(b.dataset.v)); });
     $('#cx').textContent = UI.cx == null ? ' ' : fmt(UI.cx);
     $('#cy').textContent = UI.cy == null ? ' ' : fmt(UI.cy);
-    const both = UI.cx != null && UI.cy != null, taken = both && v.board[K(UI.cx, UI.cy)];
-    const outZone = both && !inZone(v.zone, UI.cx, UI.cy);
-    $('#callWarn').textContent = taken ? '그 자리에는 이미 돌이 있어요.' : outZone ? `이번에는 ${ZONE_NAME[v.zone]}에 있는 점만 고를 수 있어요.` : '';
-    $('#btnCall').disabled = !both || !!taken || outZone || UI.sent === key;
+    const both = UI.cx != null && UI.cy != null;
+    if (readMode) {
+      const sel = UI.sel, outZ = sel && !inZone(v.zone, sel.x, sel.y), outL = sel && !inLv(lv, sel.x, sel.y);
+      $('#callWarn').textContent = !sel ? '먼저 판에서 점을 누르세요.' : outZ ? `이번에는 ${ZONE_NAME[v.zone]}에 있는 점만 고를 수 있어요.` : outL ? '이번 단계에서는 제1사분면과 축 위의 점만 쓸 수 있어요.' : !both ? '이제 누른 점의 좌표를 고르세요.' : '';
+      $('#btnCall').disabled = !sel || !both || outZ || outL || UI.sent === key;
+      $('#btnCall').textContent = '이 좌표로 놓기';
+    } else {
+      const taken = both && v.board[K(UI.cx, UI.cy)];
+      const outZone = both && !inZone(v.zone, UI.cx, UI.cy), outLv = both && !inLv(lv, UI.cx, UI.cy);
+      $('#callWarn').textContent = taken ? '그 자리에는 이미 돌이 있어요.' : outZone ? `이번에는 ${ZONE_NAME[v.zone]}에 있는 점만 고를 수 있어요.` : outLv ? '이번 단계에서는 제1사분면과 축 위의 점만 쓸 수 있어요.' : '';
+      $('#btnCall').disabled = !both || !!taken || outZone || outLv || UI.sent === key;
+      $('#btnCall').textContent = '이 좌표로 정하기';
+    }
   }
-  UI.canPlace = showPlace && UI.sent !== key;
+  UI.readMode = readMode && !rolling();
+  UI.canPlace = (showPlace || UI.readMode) && UI.sent !== key;
   $('#placeUI').classList.toggle('hidden', !showPlace);
   $('#btnPlace').disabled = !UI.sel || UI.sent === key;
   $('#board').classList.toggle('can', UI.canPlace);
@@ -946,7 +990,7 @@ function renderGame(v, mine) {
   $('#players').innerHTML = ph;
   $('#log').innerHTML = v.log.slice().reverse().map(l => l.ok
     ? `<div>${stoneHTML(l.team)} ${P(l.x, l.y)}</div>`
-    : `<div class="bad">${stoneHTML(l.team)} ✗ ${P(l.x, l.y)}을 ${P(l.tx, l.ty)}에 찍음</div>`).join('') || '<div style="color:var(--muted);font-family:Noto Sans KR">아직 없어요</div>';
+    : l.read ? `<div class="bad">${stoneHTML(l.team)} ✗ 점 ${P(l.x, l.y)}을 ${P(l.tx, l.ty)}로 읽음</div>` : `<div class="bad">${stoneHTML(l.team)} ✗ ${P(l.x, l.y)}을 ${P(l.tx, l.ty)}에 찍음</div>`).join('') || '<div style="color:var(--muted);font-family:Noto Sans KR">아직 없어요</div>';
   drawDyn(v, mine);
   // 결과
   if (over && UI.resultFor !== v.round) {
@@ -1012,6 +1056,7 @@ function zoneShade(z) {
 function drawDyn(v, mine) {
   let h = '';
   const cell = CELL;
+  if (v.level === 'low') { const f = 'rgba(22,24,28,.08)', a = X(-R - 0.5), b = X(-0.42), top = Y(R + 0.5), bot = Y(-R - 0.5); h += `<rect x="${a}" y="${top}" width="${b - a}" height="${bot - top}" fill="${f}"/><rect x="${b}" y="${Y(-0.42)}" width="${X(R + 0.5) - b}" height="${bot - Y(-0.42)}" fill="${f}"/>`; }
   if (v.luck === 'dice' && !rolling() && (v.phase === 'call' || v.phase === 'place') && v.zone && v.zone !== 'free') h += zoneShade(v.zone);
   for (const k in v.board) {
     const [x, y] = k.split(',').map(Number), tm = v.board[k];
@@ -1036,7 +1081,7 @@ function drawDyn(v, mine) {
     const ring = e.said, cross = e.tapped;
     const tx = X(cross.x), ty = Y(cross.y);
     h += `<circle cx="${X(ring.x)}" cy="${Y(ring.y)}" r="${cell * 0.42}" fill="none" stroke="var(--accent2)" stroke-width="4" stroke-dasharray="8 6"/>`;
-    h += `<text x="${X(ring.x)}" y="${Y(ring.y) + cell * 0.75}" text-anchor="middle" font-size="19" font-weight="700" fill="var(--accent2)" font-family="Noto Sans KR" stroke="#fff" stroke-width="5" paint-order="stroke">말한 자리</text>`;
+    h += `<text x="${X(ring.x)}" y="${Y(ring.y) + cell * 0.75}" text-anchor="middle" font-size="19" font-weight="700" fill="var(--accent2)" font-family="Noto Sans KR" stroke="#fff" stroke-width="5" paint-order="stroke">${e.read ? '누른 점' : '말한 자리'}</text>`;
     h += `<g stroke="var(--accent)" stroke-width="8" stroke-linecap="round"><line x1="${tx - d}" y1="${ty - d}" x2="${tx + d}" y2="${ty + d}"/><line x1="${tx + d}" y1="${ty - d}" x2="${tx - d}" y2="${ty + d}"/></g>`;
   }
   $('#dyn').innerHTML = h;
@@ -1053,10 +1098,21 @@ function showResult(v, mine) {
     const L = v.line, dx = L[1].x - L[0].x, dy = L[1].y - L[0].y;
     const hint = dy === 0 ? '모든 점의 <i class="m">y</i>좌표가 같아요. (가로줄)' : dx === 0 ? '모든 점의 <i class="m">x</i>좌표가 같아요. (세로줄)'
       : dy === dx ? '<i class="m">x</i>좌표가 1씩 커질 때 <i class="m">y</i>좌표도 1씩 커져요.' : '<i class="m">x</i>좌표가 1씩 커질 때 <i class="m">y</i>좌표는 1씩 작아져요.';
-    h += `<div class="box" style="margin-top:8px"><div style="font-weight:900">한 줄로 놓인 점들의 좌표</div><div class="winpts m">${L.map(p => P(p.x, p.y)).join(', ')}</div><div style="font-size:16px">이 점들의 좌표에서 어떤 규칙이 보이나요?</div><details class="hint"><summary>확인하기</summary>${hint}</details></div>`;
+    const dir = lineDir(L), my = UI.ruleAns && UI.ruleAns.round === v.round ? UI.ruleAns.a : null;
+    h += `<div class="box" style="margin-top:8px"><div style="font-weight:900">한 줄로 놓인 점들의 좌표</div><div class="winpts m">${L.map(p => P(p.x, p.y)).join(', ')}</div>`;
+    if (ST.settings.rule !== false || DEMO) {
+      h += `<div style="font-size:16px;font-weight:700;margin:4px 0">이 점들의 좌표에서 찾을 수 있는 규칙을 고르세요.${ptOn() && !DEMO && ST.pt.rule && mine.length && v.mode !== 'solo' ? ` <span class="note">(맞히면 +${ST.pt.rule}점)</span>` : ''}</div><div class="opts" id="ruleOpts">` +
+        RULES.map((r, i) => `<button data-r="${i}" class="${my == null ? '' : i === dir ? 'right' : i === my ? 'wrongpick' : ''}" ${my != null ? 'disabled' : ''} style="min-height:48px;font-size:18px">${r}</button>`).join('') + '</div>';
+      if (my != null) h += `<p style="margin:8px 0 0;font-size:16px"><b>${my === dir ? '⭕ 맞았어요!' : '❌ 다시 보세요.'}</b> ${hint}</p>`;
+    } else h += `<div style="font-size:16px">이 점들의 좌표에서 어떤 규칙이 보이나요?</div><details class="hint"><summary>확인하기</summary>${hint}</details>`;
+    h += '</div>';
   }
   const rows = Object.values(v.stats || {}).sort((a, b) => a.team.localeCompare(b.team));
-  if (rows.length && !oneSeat(v)) {
+  if (rows.length && v.duo) {
+    h += '<table><tr><th>돌</th><th>이름</th><th>좌표 맞힘</th><th>좌표 틀림</th></tr>';
+    rows.forEach(st => { h += `<tr><td>${stoneHTML(st.team)}</td><td>${esc(st.name)}</td><td>${st.ok}</td><td>${st.bad}</td></tr>`; });
+    h += '</table>';
+  } else if (rows.length && !oneSeat(v)) {
     h += '<table><tr><th>조</th><th>이름</th><th>말하기</th><th>찍기 성공</th><th>찍기 실수</th></tr>';
     rows.forEach(st => { h += `<tr><td>${stoneHTML(st.team)}</td><td>${esc(st.name)}</td><td>${st.calls}번</td><td>${st.ok}</td><td>${st.bad}</td></tr>`; });
     h += '</table>';
@@ -1069,10 +1125,19 @@ function showResult(v, mine) {
   h += '<button class="btn" id="btnLeave3">나가기</button></div>';
   if (!isHost && room && room.kind === 'client') h += '<p class="sub" style="font-size:15px;margin-top:8px">누구든 [한 판 더]를 누르면 바로 시작해요.</p>';
   $('#resCard').innerHTML = h; $('#resOv').classList.remove('hidden');
+  $$('#ruleOpts button').forEach(b => b.onclick = () => {
+    if (UI.ruleAns && UI.ruleAns.round === v.round) return;
+    const a = Number(b.dataset.r);
+    UI.ruleAns = { round: v.round, a };
+    if (mine.length && v.gid && v.mode !== 'solo' && v.mode !== 'demo') sendT({ t: 'rule', gid: v.gid, a });
+    showResult(curView() || v, curMine());
+  });
   const ba = $('#btnAgain'); if (ba) ba.onclick = () => { ba.disabled = true; act({ t: 'again' }); setTimeout(() => { ba.disabled = false; }, 1500); };
   const bl = $('#btnToLobby'); if (bl) bl.onclick = () => act({ t: 'lobby' });
   $('#btnLeave3').onclick = () => leaveRoom();
 }
+const RULES = ['<i class="m">x</i>좌표가 모두 같다', '<i class="m">y</i>좌표가 모두 같다', '<i class="m">x</i>좌표가 1씩 커지면 <i class="m">y</i>좌표도 1씩 커진다', '<i class="m">x</i>좌표가 1씩 커지면 <i class="m">y</i>좌표는 1씩 작아진다'];
+function lineDir(L) { const dx = L[1].x - L[0].x, dy = L[1].y - L[0].y; return dx === 0 ? 0 : dy === 0 ? 1 : dy === dx ? 2 : 3; }
 function hideResult() { $('#resOv').classList.add('hidden'); }
 
 /* ---------- 퀴즈 ---------- */
@@ -1125,6 +1190,7 @@ function bind() {
   $('#btnLeave2').onclick = confirmLeave;
   $('#btnCall').onclick = () => {
     if (UI.cx == null || UI.cy == null) return;
+    if (UI.readMode) { if (!UI.sel) return; UI.sent = UI.key; act({ t: 'read', px: UI.sel.x, py: UI.sel.y, x: UI.cx, y: UI.cy }); render(); return; }
     UI.sent = UI.key; act({ t: 'call', x: UI.cx, y: UI.cy }); render();
   };
   $('#btnPlace').onclick = () => {
@@ -1139,6 +1205,7 @@ function bind() {
     if (dx * dx + dy * dy > (CELL * 0.5) ** 2) return;
     const v = curView();
     if (v && v.board[K(x, y)]) { toast('이미 돌이 있는 자리예요', true, 1500); return; }
+    if (v && !inLv(v.level, x, y)) { toast('이번 단계에서는 제1사분면과 축 위의 점만 쓸 수 있어요', true, 1800); return; }
     UI.sel = { x, y }; render();
   });
   $('#btnRelock').onclick = retryClass;

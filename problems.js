@@ -9,7 +9,7 @@
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
   /* 교과서형 좌표평면: 흰 바탕, 옅은 모눈, 검은 굵은 축 + 양의 방향 화살표, x·y 이탤릭, O·눈금 숫자 정자체 */
-  function planeSVG(o) {
+  function planeSVG(o) {   // o.numbers === false 면 눈금 숫자 없음 (상 단계)
     const r = o.r, c = o.cell, m = o.margin, fs = o.fs || 22;
     const C = m + r * c, X = x => C + x * c, Y = y => C - y * c;
     const th = o.thick ? 1.9 : 1;   // 프로젝터용 굵은 선
@@ -109,12 +109,12 @@
 
   /* 찍기 실수 유형: 말한 좌표 s, 찍은 좌표 t */
   const MISS = {
-    swap: { name: 'x·y 바꿈', tip: 'x좌표와 y좌표를 서로 바꿔 찍었어요. 순서쌍은 (x좌표, y좌표) — 앞의 수가 가로(x축) 방향이에요.' },
-    signx: { name: 'x 부호 반대', tip: 'x좌표의 부호를 반대로 찍었어요. x좌표가 양수면 오른쪽, 음수면 왼쪽이에요.' },
-    signy: { name: 'y 부호 반대', tip: 'y좌표의 부호를 반대로 찍었어요. y좌표가 양수면 위쪽, 음수면 아래쪽이에요.' },
-    signxy: { name: '두 부호 반대', tip: 'x좌표와 y좌표의 부호를 모두 반대로 찍었어요. 원점 O에서 어느 쪽으로 가는지 부호를 먼저 보세요.' },
+    swap: { name: 'x·y 바꿈', tip: 'x좌표와 y좌표가 서로 바뀌었어요. 순서쌍은 (x좌표, y좌표) — 앞의 수가 가로(x축) 방향이에요.' },
+    signx: { name: 'x 부호 반대', tip: 'x좌표의 부호가 반대예요. 원점 O보다 오른쪽이면 양수, 왼쪽이면 음수예요.' },
+    signy: { name: 'y 부호 반대', tip: 'y좌표의 부호가 반대예요. 원점 O보다 위쪽이면 양수, 아래쪽이면 음수예요.' },
+    signxy: { name: '두 부호 반대', tip: 'x좌표와 y좌표의 부호가 모두 반대예요. 원점 O에서 어느 쪽으로 가는지 부호를 먼저 보세요.' },
     near: { name: '한 칸 어긋남', tip: '한 칸 어긋났어요. 원점 O에서부터 눈금을 하나씩 세어 보세요.' },
-    other: { name: '다른 곳', tip: '말한 좌표와 많이 다른 곳이에요. 짝에게 좌표를 다시 또박또박 말해 달라고 해 보세요.' }
+    other: { name: '다른 곳', tip: '많이 다른 곳이에요. 좌표를 천천히 다시 확인해 보세요. (x좌표 먼저, 그다음 y좌표)' }
   };
   function missType(s, t) {
     if (t.x === s.y && t.y === s.x && s.x !== s.y) return 'swap';
