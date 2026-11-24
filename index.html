@@ -146,8 +146,15 @@ label.f{display:grid;gap:6px;font-weight:700}
 .winpts{font-size:24px;line-height:1.5}
 details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;color:var(--accent2);font-weight:700}
 .row{display:flex;gap:10px;flex-wrap:wrap}
-#toast{pointer-events:none;position:fixed;left:50%;top:64px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:14px 22px;border-radius:14px;font-size:18px;z-index:90;max-width:90vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+#toast{white-space:pre-line;pointer-events:none;position:fixed;left:50%;top:64px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:14px 22px;border-radius:14px;font-size:18px;z-index:90;max-width:90vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25)}
 #toast.bad{background:var(--accent)}
+#hdrPts{font-weight:900;color:var(--ink);background:#fff4d6;border:1.5px solid #e8c74a;border-radius:99px;padding:2px 10px}
+#hdrPts.bump{animation:pop .5s ease-out}
+.ptline{margin-top:10px;background:#fff8d6;border:2px solid #e8c74a;border-radius:14px;padding:8px 12px;font-size:17px}
+.ptline b{font-size:22px}
+.ptline .note b{font-size:inherit}
+.misstip{display:block;font-size:15px;font-weight:400;margin-top:4px}
+#earnOv{z-index:60}
 #verBar{background:var(--accent);color:#fff;text-align:center;padding:8px;font-weight:700}
 @keyframes pop{0%{transform:scale(.3);opacity:.2}70%{transform:scale(1.12)}100%{transform:scale(1)}}
 .pop{animation:pop .35s ease-out;transform-box:fill-box;transform-origin:center}
@@ -159,7 +166,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 <div id="verBar" class="hidden">새 버전이 있어요. 화면을 새로고침해 주세요. <button class="btn sm" onclick="location.reload()">새로고침</button></div>
 <header>
   <h1>좌표평면 오목</h1><span class="sp"></span>
-  <div id="hdrInfo"><span id="hdrName"></span><span id="hdrRoom"></span><span class="dot" id="hdrDot" title="수업 연결"></span></div>
+  <div id="hdrInfo"><span id="hdrPts" class="hidden"></span><span id="hdrName"></span><span id="hdrRoom"></span><span class="dot" id="hdrDot" title="수업 연결"></span></div>
 </header>
 
 <!-- 수업 들어가기 -->
@@ -168,7 +175,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
     <p class="title">좌표평면 오목</p>
     <p class="sub">좌표를 말하는 사람, 점을 찍는 사람 — 둘이 한 조가 되어 대결해요.</p>
     <div class="card" style="display:grid;gap:14px">
-      <label class="f">내 이름<input id="inName" class="txt" maxlength="10" placeholder="예: 김민지"></label>
+      <label class="f">번호와 이름<input id="inName" class="txt" maxlength="12" placeholder="예: 7 김민지"></label>
       <label class="f">수업 코드 (선생님 화면의 4자리)<input id="inCode" class="txt" inputmode="numeric" maxlength="4" placeholder="0000"></label>
       <button id="btnJoinClass" class="btn pri">수업 들어가기</button>
       <div id="diag" class="hidden">
@@ -189,6 +196,8 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
       <button class="btn pri" id="btnCreate">방 만들기 (4명)</button>
       <div class="joinrow"><input id="inRoom" class="txt" inputmode="numeric" maxlength="4" placeholder="방 코드 4자리"><button class="btn" id="btnJoinRoom">방 들어가기</button></div>
       <button class="btn" id="btnCpu2">우리 조(2명) vs 컴퓨터</button>
+      <div id="homePts" class="ptline hidden"></div>
+      <button class="btn hidden" id="btnEarn">🪙 좌표 문제 풀고 포인트 받기</button>
     </div>
     <div id="homeDemo" class="menu hidden">
       <div class="row" id="demoN"><button class="btn sm pri" data-n="4">4목</button><button class="btn sm" data-n="5">5목</button></div>
@@ -261,6 +270,8 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 <div id="resOv" class="ov hidden"><div class="card" id="resCard"></div></div>
 <!-- 퀴즈 -->
 <div id="quizOv" class="ov hidden"><div class="card" id="quizCard"></div></div>
+<!-- 충전 문제 -->
+<div id="earnOv" class="ov hidden"><div class="card" id="earnCard"></div></div>
 <!-- 멈춤 -->
 <div id="pauseOv" class="ov hidden"><div class="card"><div style="font-size:60px">✋</div><div id="pauseMsg">선생님을 봐 주세요</div></div></div>
 <!-- 연결 끊김 잠금 -->
@@ -269,7 +280,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 
 <script>
 'use strict';
-const APP_VER = 5, R = 5;
+const APP_VER = 6, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -285,7 +296,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const DEV = sessionStorage.cgDev || (sessionStorage.cgDev = 'd' + Math.random().toString(36).slice(2, 10));
 const rid = () => Date.now() + Math.random();
 
-const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none' }, paused: false, classOk: false, quiz: null, status: '' };
+const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false }, paused: false, classOk: false, quiz: null, status: '', pt: null, bal: null, earn: null };
 let myName = localStorage.cgName || '';
 
 /* ---------- 화면 공통 ---------- */
@@ -314,8 +325,11 @@ function setDiag(n, s, msg) {
   if (msg !== undefined) $('#diagMsg').textContent = msg;
 }
 function joinClass() {
-  const nm = $('#inName').value.trim(), cd = $('#inCode').value.trim();
-  if (!nm) return toast('이름을 입력하세요', true);
+  const raw = $('#inName').value.trim(), cd = $('#inCode').value.trim();
+  if (!raw) return toast('번호와 이름을 입력하세요', true);
+  const nm = CoordKit.normName(raw);
+  if (!nm) return toast('번호와 이름을 같이 써 주세요 (예: 7 김민지)', true, 3200);
+  $('#inName').value = nm;
   if (!/^\d{4}$/.test(cd)) return toast('수업 코드 4자리를 입력하세요', true);
   myName = nm; localStorage.cgName = nm; localStorage.cgCode = cd; ST.code = cd; hdr();
   $('#diag').classList.remove('hidden'); [1, 2, 3].forEach(i => setDiag(i, '')); setDiag(1, 'busy', '');
@@ -365,7 +379,7 @@ function onTeacher(m) {
     case 'pong': break;
     case 'sync':
       if (m.ver !== APP_VER) $('#verBar').classList.remove('hidden');
-      applySettings(m.settings); setPause(m.pause);
+      applySettings(m.settings); setPause(m.pause); setPt(m.pt);
       if (m.quiz) openQuiz(m.quiz); else closeQuiz();
       break;
     case 'ver': if (m.ver !== APP_VER) $('#verBar').classList.remove('hidden'); break;
@@ -375,10 +389,18 @@ function onTeacher(m) {
     case 'quizReveal': revealQuiz(m); break;
     case 'quizClose': closeQuiz(); break;
     case 'home': if (room) leaveRoom(true); goHome(); toast('선생님이 처음 화면으로 모았어요'); break;
+    case 'pt': setPt(m.pt); break;
+    case 'points': gotPoints(m); break;
+    case 'earnQ': openEarn(m); break;
+    case 'earnRes': earnResult(m); break;
+    case 'earnNo': ST.earnWait = false; refreshHome(); toast(m.msg || '지금은 풀 수 없어요', true); break;
   }
 }
 function applySettings(s) {
-  if (!s) return; ST.settings = Object.assign(ST.settings, s);
+  if (!s) return;
+  const thick0 = !!ST.settings.thick;
+  ST.settings = Object.assign(ST.settings, s);
+  if (!!ST.settings.thick !== thick0) { buildBoard(); if (room) render(); if (ST.quiz) drawQuiz(); if (ST.earn) drawEarn(); }
   if (room && room.kind === 'host' && room.E.phase === 'lobby') { applyRules(room.E); update(); }
   refreshHome();
 }
@@ -387,6 +409,54 @@ function setPause(p) {
   $('#pauseMsg').textContent = (p && p.msg) || '선생님을 봐 주세요';
   $('#pauseOv').classList.toggle('hidden', !ST.paused);
 }
+
+/* ---------- 포인트 (장부는 선생님 화면이 원본, 여기는 보여 주기만) ---------- */
+const ptOn = () => !!(ST.pt && ST.pt.on);
+function setPt(p) { ST.pt = p || null; hdrPts(); refreshHome(); if (room) render(); }
+function hdrPts() {
+  const el = $('#hdrPts'), on = ptOn() && ST.bal != null && !DEMO;
+  el.classList.toggle('hidden', !on);
+  if (on) el.textContent = '💰 ' + ST.bal + '점';
+}
+function gotPoints(m) {
+  if (!Number.isFinite(m.bal)) return;
+  ST.bal = m.bal; hdrPts(); refreshHome();
+  if (m.d) {
+    const el = $('#hdrPts'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+    const txt = `💰 ${m.d > 0 ? '+' : ''}${m.d}점` + (m.why ? ` (${m.why})` : '');
+    toast(txt, m.d < 0, 3500);
+    UI.lastPts = { txt, bal: m.bal, at: Date.now() };
+    const rp = $('#resPts'); if (rp) rp.innerHTML = ptsLine();
+  } else if (m.why) { UI.lastPts = { txt: '💰 ' + m.why, bal: m.bal, at: Date.now() }; const rp = $('#resPts'); if (rp) rp.innerHTML = ptsLine(); }
+}
+function ptsLine() { const l = UI.lastPts; return l ? `<div class="ptline">${esc(l.txt)}<br>지금 내 포인트: <b>${l.bal}</b>점</div>` : ''; }
+/* 충전 문제 (선생님 화면이 문제를 만들고 채점) */
+function askEarn() { if (!ST.classOk || ST.earnWait) return; ST.earnWait = true; refreshHome(); sendT({ t: 'earnReq' }); setTimeout(() => { ST.earnWait = false; refreshHome(); }, 4000); }
+function openEarn(m) { ST.earnWait = false; ST.earn = { id: m.id, q: m.q, fig: m.fig, options: m.options, my: null, res: null }; drawEarn(); $('#earnOv').classList.remove('hidden'); refreshHome(); }
+function earnResult(m) { if (!ST.earn || ST.earn.id !== m.id) return; ST.earn.res = m; if (Number.isFinite(m.bal)) { ST.bal = m.bal; hdrPts(); } drawEarn(); refreshHome(); }
+function drawEarn() {
+  const z = ST.earn; if (!z) return;
+  let h = `<p style="font-weight:900;color:#8a6d00;margin:0 0 6px">🪙 충전 문제 · 맞히면 +${ST.pt ? ST.pt.earn : 0}점</p><p class="q" style="font-weight:900;font-size:22px;margin:0 0 10px">${esc(z.q).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>')}</p>`;
+  if (z.fig) h += `<div class="fig" style="max-width:340px;margin:0 auto 10px">${CoordKit.quizFigSVG(z.fig, ST.settings.thick)}</div>`;
+  h += '<div class="opts">' + z.options.map((o, i) => {
+    let cls = '';
+    if (z.res) cls = i === z.res.answer ? 'right' : (i === z.my ? 'wrongpick' : '');
+    else if (i === z.my) cls = 'pick';
+    return `<button data-i="${i}" class="${cls}" ${z.my != null ? 'disabled' : ''}><span class="m">${esc(o)}</span></button>`;
+  }).join('') + '</div>';
+  if (z.res) {
+    h += `<div class="box" style="margin-top:10px;font-size:17px"><b>${z.res.ok ? `⭕ 정답! +${z.res.d}점` : '❌ 아쉬워요'}</b><br>${esc(z.res.explain || '')}</div><div class="row" style="margin-top:10px">`;
+    if (z.res.more) h += '<button class="btn pri" id="btnEarnMore">한 문제 더</button>';
+    h += '<button class="btn" id="btnEarnClose">닫기</button></div>';
+  } else if (z.my != null) h += '<p class="sub" style="margin-top:10px">채점하는 중…</p>';
+  else h += '<div class="row" style="margin-top:10px"><button class="btn" id="btnEarnClose">그만두기</button></div>';
+  $('#earnCard').innerHTML = h;
+  if (z.res) { const last = $('#earnCard .row'); if (last && last.scrollIntoView) last.scrollIntoView({ block: 'nearest' }); }
+  $$('#earnCard .opts button').forEach(b => b.onclick = () => { if (z.my != null) return; z.my = Number(b.dataset.i); sendT({ t: 'earnAns', id: z.id, a: z.my }); drawEarn(); });
+  const bc = $('#btnEarnClose'); if (bc) bc.onclick = closeEarn;
+  const bm = $('#btnEarnMore'); if (bm) bm.onclick = () => { bm.disabled = true; askEarn(); };
+}
+function closeEarn() { ST.earn = null; $('#earnOv').classList.add('hidden'); refreshHome(); }
 
 /* ---------- 처음 화면 ---------- */
 function goHome() { show('home'); refreshHome(); }
@@ -398,6 +468,13 @@ function refreshHome() {
   $('#btnCreate').disabled = !ok; $('#btnJoinRoom').disabled = !ok;
   $('#btnCpu2').disabled = !ok; $('#btnCpu2').classList.toggle('hidden', !ST.settings.cpu);
   $('#btnSolo').classList.toggle('hidden', !DEMO && (!ST.settings.solo || !ok));
+  const P = ST.pt, pon = ptOn() && !DEMO && ST.bal != null;
+  $('#homePts').classList.toggle('hidden', !pon);
+  if (pon) $('#homePts').innerHTML = `💰 내 포인트 <b>${ST.bal}</b>점<div class="note" style="margin-top:4px">맞게 찍기 +${P.place} · 4명 대전 승리 +${P.win}${P.draw ? ` · 무승부 +${P.draw}` : ''} · 컴퓨터 이기기 +${P.cpuWin} · 좌표 퀴즈 정답 +${P.quiz}${P.bet ? ` · <b>판돈 ${P.bet}점</b>(진 조가 이긴 조에게)` : ''} · 같은 사람들끼리 ${P.streak}판 넘게 연속이면 승리 점수 없음</div>`;
+  const canEarn = pon && P.earn > 0 && ST.bal < P.refill;
+  $('#btnEarn').classList.toggle('hidden', !canEarn);
+  $('#btnEarn').disabled = !ok || !!ST.earnWait || !!ST.earn;
+  if (canEarn) $('#btnEarn').textContent = `🪙 좌표 문제 풀고 포인트 받기 (+${P.earn}점, ${P.refill}점보다 적을 때)`;
   $('#ruleN').textContent = ST.settings.n;
   $('#ruleP').textContent = ST.settings.penalty ? '차례를 잃어요' : '다시 찍어요';
   $('#ruleAlt').innerHTML = ST.settings.alt ? '<b>번갈아 부르기</b>: 우리 조 차례가 끝날 때마다 말하는 사람과 찍는 사람이 서로 바뀌어요.' : '한 판이 끝나면 조 안에서 말하는 사람과 찍는 사람이 바뀌어요.';
@@ -496,7 +573,7 @@ function ePlace(E, seat, x, y) {
   if (good) { pst(E, seat).ok++; E.ev = { id: rid(), kind: 'put', team, x, y }; afterFirst(E, team, x, y); return 'ok'; }
   pst(E, seat).bad++;
   E.log.push({ team, x: s.x, y: s.y, tx: x, ty: y, ok: false });
-  E.ev = { id: rid(), kind: 'wrong', team, said: { x: s.x, y: s.y }, tapped: { x, y }, pass: E.penalty };
+  E.ev = { id: rid(), kind: 'wrong', team, said: { x: s.x, y: s.y }, tapped: { x, y }, pass: E.penalty, by: E.seats[seat] ? E.seats[seat].dev : null, miss: CoordKit.missType(s, { x, y }) };
   if (E.penalty) endTurn(E, team);
   return 'wrong';
 }
@@ -715,8 +792,11 @@ const UI = { key: null, sel: null, cx: null, cy: null, flashId: null, flash: nul
 function buildBoard() {
   const b = $('#board'); b.setAttribute('viewBox', `0 0 ${SZ} ${SZ}`);
   const bg = $('#bg'); bg.setAttribute('width', SZ); bg.setAttribute('height', SZ);
-  $('#plane').innerHTML = CoordKit.planeSVG({ r: R, cell: CELL, margin: MG, fs: 27, part: 'base' });
-  $('#planeLab').innerHTML = CoordKit.planeSVG({ r: R, cell: CELL, margin: MG, fs: 27, part: 'labels' });
+  const thick = !!ST.settings.thick;
+  $('#plane').innerHTML = CoordKit.planeSVG({ r: R, cell: CELL, margin: MG, fs: thick ? 31 : 27, part: 'base', thick });
+  $('#planeLab').innerHTML = CoordKit.planeSVG({ r: R, cell: CELL, margin: MG, fs: thick ? 31 : 27, part: 'labels', thick });
+  if (UI.boardBuilt) return;
+  UI.boardBuilt = true;
   ['x', 'y'].forEach(ax => {
     const box = $(`.nums[data-axis="${ax}"]`); let h = '';
     for (let i = -R; i <= R; i++) h += `<button data-v="${i}">${fmt(i)}</button>`;
@@ -739,7 +819,7 @@ function renderLobby(v, mine) {
   const isHost = room.kind === 'host';
   $('#lbCode').textContent = v.code;
   $('#lbHint').textContent = v.mode === 'cpu2' ? '짝에게 알려 주세요 (2명)' : '친구들에게 알려 주세요 (4명)';
-  $('#lbInfo').textContent = `이번 판: ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'}${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''} · 자리를 눌러 앉으세요`;
+  $('#lbInfo').textContent = `이번 판: ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'}${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet && v.mode === 'online' ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
   let h = '';
   ['A', 'B'].forEach(t => {
     h += `<div class="card team"><h3>${stoneHTML(t)} ${TEAM[t]}</h3>`;
@@ -767,19 +847,26 @@ function renderGame(v, mine) {
   const key = [v.round, v.moves, v.log.length, v.phase, v.turn].join('|');
   if (key !== UI.key) { UI.key = key; UI.sel = null; UI.cx = null; UI.cy = null; UI.sent = null; }
   // 이벤트
+  let wrongMsg = null;
   if (v.ev && v.ev.id !== UI.flashId) {
     UI.flashId = v.ev.id;
     if (v.ev.kind === 'wrong') {
-      UI.flash = { ev: v.ev, until: Date.now() + 3800 };
-      toast(`✗ ${TEAM[v.ev.team]}: 말한 좌표 ${P(v.ev.said.x, v.ev.said.y)}와 다른 곳에 찍었어요!` + (v.ev.pass ? ' 차례가 넘어가요.' : ' 다시 찍으세요.'), true, 3800);
-      setTimeout(() => { if (room) render(); }, 3900);
+      const mineMiss = v.ev.by === DEV && v.mode !== 'demo' && !v.autoPlace;
+      const mt = CoordKit.MISS[v.ev.miss];
+      UI.flash = { ev: v.ev, until: Date.now() + (mineMiss ? 6000 : 3800) };
+      wrongMsg = [`✗ ${TEAM[v.ev.team]}: 말한 좌표 ${P(v.ev.said.x, v.ev.said.y)}와 다른 곳에 찍었어요!` + (v.ev.pass ? ' 차례가 넘어가요.' : ' 다시 찍으세요.') + (mt ? (mineMiss ? '\n💡 ' + mt.tip : ` (${mt.name})`) : ''), mineMiss ? 6000 : 3800];
+      if (mineMiss) sendT({ t: 'miss', id: String(v.ev.id), said: v.ev.said, tapped: v.ev.tapped });
+      setTimeout(() => { if (room) render(); }, mineMiss ? 6100 : 3900);
     } else if (v.ev.kind === 'left') toast(`${v.ev.name}의 연결이 끊겼어요. 다시 들어오면 이어서 해요.`, true, 3500);
     else if (v.ev.kind === 'put') UI.popId = v.ev.id;
     else if (v.ev.kind === 'roll') playRoll(v.ev);
   }
   const mineKey = mine.join(',');
-  if (UI.mineKey != null && UI.mineKey !== mineKey && v.alt && v.round === UI.mineRound && mine.length === 1 && v.mode !== 'demo')
-    toast(`역할이 바뀌었어요! 다음 우리 조 차례에 나는 ${mine[0][1] === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람'}`, false, 3000);
+  if (UI.mineKey != null && UI.mineKey !== mineKey && v.alt && v.round === UI.mineRound && mine.length === 1 && v.mode !== 'demo') {
+    const roleMsg = `역할이 바뀌었어요! 다음 우리 조 차례에 나는 ${mine[0][1] === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람'}`;
+    if (wrongMsg) wrongMsg[0] += '\n' + roleMsg; else toast(roleMsg, false, 3000);
+  }
+  if (wrongMsg) toast(wrongMsg[0], true, wrongMsg[1]);
   UI.mineKey = mineKey; UI.mineRound = v.round;
   const t = v.turn, cpuTurn = v.cpuTeam === t;
   const iCall = mine.includes(t + 'c'), iPlace = mine.includes(t + 'p');
@@ -962,6 +1049,7 @@ function showResult(v, mine) {
     rows.forEach(st => { h += `<tr><td>${stoneHTML(st.team)}</td><td>${esc(st.name)}</td><td>${st.calls}번</td><td>${st.ok}</td><td>${st.bad}</td></tr>`; });
     h += '</table>';
   }
+  if (ptOn() && !DEMO && v.mode !== 'demo' && v.mode !== 'solo' && mine.length) h += `<div id="resPts">${UI.lastPts && Date.now() - UI.lastPts.at < 8000 ? ptsLine() : '<div class="ptline">💰 포인트 계산 중…</div>'}</div>`;
   const isHost = room && room.kind === 'host';
   h += '<div class="row" style="margin-top:12px">';
   if (mine.length) h += `<button class="btn pri" id="btnAgain">${v.autoPlace || v.alt ? '한 판 더' : '역할 바꿔서 한 판 더'}</button>`;
@@ -987,7 +1075,7 @@ function openQuiz(q) {
 function drawQuiz() {
   const z = ST.quiz; if (!z) return;
   let h = `<p class="q">${esc(z.q).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>')}</p>`;
-  if (z.fig) h += `<div class="fig">${CoordKit.quizFigSVG(z.fig)}</div>`;
+  if (z.fig) h += `<div class="fig">${CoordKit.quizFigSVG(z.fig, ST.settings.thick)}</div>`;
   h += '<div class="opts">' + z.options.map((o, i) => {
     let cls = '';
     if (z.reveal) cls = i === z.reveal.answer ? 'right' : (i === z.my ? 'wrongpick' : '');
@@ -1014,6 +1102,7 @@ function bind() {
   $('#btnJoinRoom').onclick = () => joinRoom($('#inRoom').value.trim());
   $('#inRoom').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom($('#inRoom').value.trim()); });
   $('#btnSolo').onclick = () => startLocal('solo');
+  $('#btnEarn').onclick = askEarn;
   $('#btnDemo').onclick = () => startLocal('demo');
   $$('#demoL button').forEach(b => b.onclick = () => { ST.settings.luck = b.dataset.l; $$('#demoL button').forEach(x => x.classList.toggle('pri', x === b)); refreshHome(); });
   $$('#demoN button').forEach(b => b.onclick = () => { ST.settings.n = Number(b.dataset.n); $$('#demoN button').forEach(x => x.classList.toggle('pri', x === b)); refreshHome(); });
