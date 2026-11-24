@@ -154,7 +154,7 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
         <div class="row"><b>단계</b><div class="seg" id="segLv"><button data-v="low">하 · 제1사분면</button><button data-v="mid">중 · 네 사분면</button><button data-v="high">상 · 눈금 숫자 없이</button></div></div>
         <div class="row"><b>운 요소</b><div class="seg" id="segLuck"><button data-l="none">없음</button><button data-l="dice">🎲 사분면 주사위</button></div></div>
         <label class="tg"><input type="checkbox" id="optAlt"> 번갈아 부르기 (차례마다 조 안에서 역할 교대, 끄면 판마다)</label>
-        <label class="tg"><input type="checkbox" id="optShow"> 찍는 사람 화면에 짝이 고른 좌표 보이기 <span class="sub">(켜면 듣지 않고 보고 찍을 수 있어요 · 처음 익힐 때만 권해요)</span></label>
+        <label class="tg"><input type="checkbox" id="optShow"> 찍는 사람 화면에 짝이 고른 좌표 보이기</label>
         <label class="tg"><input type="checkbox" id="optRule"> 판이 끝나면 한 줄로 놓인 점들의 규칙 고르기</label>
         <label class="tg"><input type="checkbox" id="optPenalty"> 틀리게 찍으면 차례 잃기 (끄면 다시 찍기)</label>
         <label class="tg"><input type="checkbox" id="optCpu"> 2명 vs 컴퓨터 허용</label>
@@ -241,7 +241,6 @@ const S = Object.assign({
   pt: null, bal: {}, ptLog: [], run: {}, miss: [], helped: {}
 }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
 S.settings = Object.assign({ n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, S.settings);
-if (!S.settings.v8) { S.settings.v8 = true; S.settings.showCall = false; }   // v8: 듣고 찍기를 살리려고 '짝이 고른 좌표 보이기' 기본 끔 (한 번만)
 const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, rule: 2, bet: 0, streak: 3, refill: 10, earn: 2 };
 S.pt = Object.assign({}, PT_DEF, S.pt);
 ['bal', 'run', 'helped'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
