@@ -133,5 +133,29 @@
     return (+m[1]) + ' ' + nm;
   }
 
-  window.CoordKit = { fmt, pt, planeSVG, quizFigSVG, makeQuiz, TYPES, MINUS, MISS, missType, normName };
+  /* 낱말 사전 (교과서 중1 좌표평면) — 화면의 파란 밑줄 낱말을 누르면 뜻이 나옴 */
+  const GLOSS = {
+    '좌표평면': '좌표축이 정해져 있는 평면이에요.',
+    '좌표축': 'x축과 y축을 함께 이르는 말이에요.',
+    'x축': '좌표평면에서 가로로 놓인 수직선이에요.',
+    'y축': '좌표평면에서 세로로 놓인 수직선이에요.',
+    '원점': '두 좌표축이 만나는 점 O예요. 원점의 좌표는 (0, 0)이에요.',
+    '순서쌍': '두 수의 순서를 정하여 짝 지어 나타낸 것이에요. (2, 3)과 (3, 2)는 서로 다른 순서쌍이에요.',
+    'x좌표': '점의 좌표 (a, b)에서 앞의 수 a예요. 점에서 x축에 수선을 그어 만나는 점이 나타내는 수예요.',
+    'y좌표': '점의 좌표 (a, b)에서 뒤의 수 b예요. 점에서 y축에 수선을 그어 만나는 점이 나타내는 수예요.',
+    '좌표': '점 P에서 x축, y축에 수선을 그어 만나는 점이 나타내는 수 a, b로 만든 순서쌍 (a, b)를 점 P의 좌표라고 해요. P(a, b)로 나타내요.',
+    '사분면': '좌표평면은 좌표축에 의해 네 부분으로 나뉘어요. 오른쪽 위부터 시계 반대 방향으로 제1사분면, 제2사분면, 제3사분면, 제4사분면이에요. 좌표축 위의 점은 어느 사분면에도 속하지 않아요.'
+  };
+  const GLOSS_RE = new RegExp('(' + Object.keys(GLOSS).sort((a, b) => b.length - a.length).join('|') + ')', 'g');
+  /* 이미 HTML로 바꾼 글에서 낱말마다 처음 한 번만 밑줄(태그 안은 건드리지 않음) */
+  function glossify(html) {
+    const seen = new Set();
+    return String(html).split(/(<[^>]+>)/).map(part => part.startsWith('<') ? part : part.replace(GLOSS_RE, w => {
+      const key = /사분면$/.test(w) ? '사분면' : w;
+      if (seen.has(key)) return w; seen.add(key);
+      return `<u class="gl" data-g="${key}">${w}</u>`;
+    })).join('');
+  }
+
+  window.CoordKit = { fmt, pt, planeSVG, quizFigSVG, makeQuiz, TYPES, MINUS, MISS, missType, normName, GLOSS, glossify };
 })();
