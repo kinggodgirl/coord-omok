@@ -136,10 +136,6 @@ nav button.alarm{color:var(--accent)}
 
   <section data-pane="points" class="hidden">
     <div class="card">
-      <div class="row" style="justify-content:space-between"><h3 style="margin:0">🎯 오늘의 미션 <span class="sub">(반 전체가 같은 미션 3개 · 날마다 바뀜)</span></h3><button class="btn sm" id="btnMisNew">🔄 미션 다시 뽑기</button></div>
-      <table style="margin-top:10px"><thead><tr id="misHead"></tr></thead><tbody id="misBody"></tbody></table>
-    </div>
-    <div class="card">
       <div class="row" style="justify-content:space-between"><h3 style="margin:0">💰 포인트 <label class="tg" style="display:inline-flex;font-size:15px;margin-left:10px"><input type="checkbox" id="ptOn"> 포인트 쓰기</label></h3>
         <div class="row"><button class="btn sm" id="btnBigPts">📺 순위 크게 보기</button><button class="btn sm" id="btnCsvP">CSV 내려받기</button><button class="btn sm" id="btnPtReset">모두 처음 점수로</button></div></div>
       <div class="ptgrid" id="ptGrid"></div>
@@ -228,7 +224,7 @@ nav button.alarm{color:var(--accent)}
 
 <script>
 'use strict';
-const APP_VER = 9;
+const APP_VER = 10;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mathify = s => esc(s).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>');
@@ -245,14 +241,14 @@ const S = Object.assign({
   settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none' },
   pause: { on: false, msg: '선생님을 봐 주세요 👀' },
   games: [], quiz: null, offline: [],
-  pt: null, bal: {}, ptLog: [], run: {}, miss: [], helped: {}, mis: null
+  pt: null, bal: {}, ptLog: [], run: {}, miss: [], helped: {}
 }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
 S.settings = Object.assign({ n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, S.settings);
-const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, rule: 2, mis: 3, misAll: 10, bet: 0, streak: 3, refill: 10, earn: 2 };
+const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, rule: 2, bet: 0, streak: 3, refill: 10, earn: 2 };
 S.pt = Object.assign({}, PT_DEF, S.pt);
 ['bal', 'run', 'helped'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
 ['ptLog', 'miss'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
-function save() { try { localStorage.setItem(LS, JSON.stringify({ code: S.code, settings: S.settings, pause: S.pause, games: S.games, quiz: S.quiz, offline: S.offline, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped, mis: S.mis })); } catch (e) { } }
+function save() { try { localStorage.setItem(LS, JSON.stringify({ code: S.code, settings: S.settings, pause: S.pause, games: S.games, quiz: S.quiz, offline: S.offline, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped })); } catch (e) { } }
 
 /* ---------- 연결 : Firebase (fbnet.js) ----------
    omok/{수업 코드}/hub 를 이 화면이 차지 → 학생은 up 으로 보내고, 이 화면은 dm(한 명)·down(모두)으로 보냄
@@ -315,11 +311,11 @@ function onPresence(dev, on, info) {
     if (!on) return;
     st = { name: String(info.name || '학생').slice(0, 10), dev, conn: stuConn(dev), status: info.status || '', ver: info.ver, last: Date.now(), on: true };
     students.set(dev, st); S.offline = S.offline.filter(x => x !== dev);
-    st.conn.send(syncMsg()); sendBal(st); sendMis(st.name);
+    st.conn.send(syncMsg()); sendBal(st);
   } else {
     const was = st.on; st.on = on;
     if (info) { if (info.name) st.name = String(info.name).slice(0, 10); if (info.status) st.status = info.status; if (info.ver) st.ver = info.ver; }
-    if (on && !was) { st.last = Date.now(); st.conn.send(syncMsg()); sendBal(st); sendMis(st.name); }
+    if (on && !was) { st.last = Date.now(); st.conn.send(syncMsg()); sendBal(st); }
   }
   renderStudents();
 }
@@ -329,7 +325,7 @@ function onStudentMsg(dev, m) {
     const old = students.get(dev);
     students.set(dev, { name: String(m.name || '학생').slice(0, 10), dev, conn: stuConn(dev), status: m.status || (old && old.status) || '', ver: m.ver, last: Date.now(), on: true });
     S.offline = S.offline.filter(x => x !== dev);
-    students.get(dev).conn.send(syncMsg()); sendBal(students.get(dev)); sendMis(students.get(dev).name);
+    students.get(dev).conn.send(syncMsg()); sendBal(students.get(dev));
     renderStudents(); renderPoints();
     return;
   }
@@ -391,7 +387,6 @@ function addGame(m) {
   const g = { gid: String(m.gid), time: Date.now(), mode: MODE[m.mode] ? m.mode : 'online', n: m.n === 5 ? 5 : 4, winner: ['A', 'B', 'draw'].includes(m.winner) ? m.winner : 'draw', moves: m.moves | 0, players, cpuTeam: m.cpuTeam || null, dir: [0, 1, 2, 3].includes(m.dir) ? m.dir : null, level: ['low', 'mid', 'high'].includes(m.level) ? m.level : 'mid' };
   S.games.push(g);
   awardGame(g);
-  misGame(g);
   save(); renderRecords(); renderStudents(); renderPoints();
 }
 let range = 'today';
@@ -414,7 +409,7 @@ const stamp = () => new Date().toISOString().slice(0, 10);
 /* ---------- 포인트 (장부는 이 화면이 원본) ---------- */
 const PT_FIELDS = [
   ['start', '처음 지급', 0, 1000], ['place', '맞게 찍기·1:1 좌표 맞히기 1번', 0, 10], ['win', '대전 승리 (2:2·1:1, 한 사람당)', 0, 50], ['draw', '대전 무승부', 0, 50],
-  ['cpuWin', '컴퓨터 이기기', 0, 50], ['quiz', '좌표 퀴즈 정답', 0, 50], ['mis', '오늘의 미션 1개', 0, 20], ['misAll', '미션 3개 모두 보너스', 0, 50], ['rule', '판 끝 규칙 고르기 정답', 0, 20], ['bet', '판돈 (0이면 안 걺)', 0, 100], ['streak', '같은 사람들 연속 제한(판)', 1, 20],
+  ['cpuWin', '컴퓨터 이기기', 0, 50], ['quiz', '좌표 퀴즈 정답', 0, 50], ['rule', '판 끝 규칙 고르기 정답', 0, 20], ['bet', '판돈 (0이면 안 걺)', 0, 100], ['streak', '같은 사람들 연속 제한(판)', 1, 20],
   ['refill', '충전 문제: 이 점수보다 적으면', 0, 1000], ['earn', '충전 문제 1개', 0, 20]
 ];
 const publicPt = () => ({ on: S.pt.on, bet: S.pt.bet, place: S.pt.place, win: S.pt.win, draw: S.pt.draw, cpuWin: S.pt.cpuWin, quiz: S.pt.quiz, rule: S.pt.rule, refill: S.pt.refill, earn: S.pt.earn, streak: S.pt.streak });
@@ -466,76 +461,6 @@ function awardQuiz(q) {
   if (!S.pt.on || !q || q.paid) return;
   q.paid = true;
   Object.entries(q.answers).forEach(([n, a]) => { if (a === q.answer) { const d = addPts(n, S.pt.quiz, '좌표 퀴즈 정답'); notify(n, d, '좌표 퀴즈 정답'); } });
-}
-
-/* ---------- 🎯 오늘의 미션 (한 걸음 수학): 반 전체 같은 3개, 하나에 +3, 셋 다 +10 ---------- */
-const MIS = {
-  place5: { nm: '맞게 찍기 5번 (2:2·컴퓨터 대결)', n: 5, k: 'place' },
-  call3: { nm: '2:2에서 말하는 사람 3번 하기', n: 3, k: 'call' },
-  read3: { nm: '1:1에서 점의 좌표 3번 맞히기', n: 3, k: 'read' },
-  play2: { nm: '친구와 대전 2판 하기', n: 2, k: 'play' },
-  clean1: { nm: '실수 없이 한 판 끝내기', n: 1, k: 'clean' },
-  rule1: { nm: '판 끝 규칙 고르기 1번 맞히기', n: 1, k: 'rule' }
-};
-function misPool() { return Object.keys(MIS).filter(id => !(id === 'read3' && S.settings.duo === false) && !(id === 'call3' && S.settings.quad === false) && !(id === 'rule1' && S.settings.rule === false)); }
-function misToday() {
-  const d = todayStr(Date.now());
-  if (!S.mis || S.mis.d !== d) {
-    let h = 0; for (const c of d) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-    const pool = misPool(), ids = [];
-    while (ids.length < 3 && pool.length) { h = (h * 1103515245 + 12345) >>> 0; ids.push(pool.splice(h % pool.length, 1)[0]); }
-    S.mis = { d, ids, by: {} }; save();
-  }
-  return S.mis;
-}
-function misRow(name) { const M = misToday(); return M.by[name] || (M.by[name] = { c: {}, done: {}, all: false }); }
-function misBump(name, inc) {
-  const r = misRow(name), M = S.mis; let changed = false; const newDone = [];
-  Object.entries(inc).forEach(([k, v]) => { if (v > 0) { r.c[k] = (r.c[k] || 0) + v; changed = true; } });
-  M.ids.forEach(id => {
-    const m = MIS[id]; if (!m || r.done[id] || (r.c[m.k] || 0) < m.n) return;
-    r.done[id] = true; newDone.push(m.nm);
-    if (S.pt.on && S.pt.mis) { const d = addPts(name, S.pt.mis, '오늘의 미션 · ' + m.nm); notify(name, d, '오늘의 미션 · ' + m.nm); }
-  });
-  if (!r.all && M.ids.length && M.ids.every(id => r.done[id])) {
-    r.all = true;
-    if (S.pt.on && S.pt.misAll) { const d = addPts(name, S.pt.misAll, '오늘의 미션 모두 완료 보너스'); notify(name, d, '오늘의 미션 모두 완료 보너스'); }
-  }
-  if (changed || newDone.length) { save(); sendMis(name, newDone); renderMisTable(); }
-}
-function misGame(g) {
-  if (g.mode === 'solo') return;
-  g.players.forEach(p => {
-    const inc = {};
-    if (g.mode === 'online' || g.mode === 'cpu2') inc.place = p.ok || 0;
-    if (g.mode === 'online') inc.call = p.calls || 0;
-    if (g.mode === 'duo') inc.read = p.ok || 0;
-    if (VS(g.mode)) inc.play = 1;
-    if (VS(g.mode) && !(p.bad > 0) && (p.ok || 0) + (p.calls || 0) > 0) inc.clean = 1;
-    misBump(p.name, inc);
-  });
-}
-/* 🪞 나의 오늘: 학생 화면에 보낼 요약 */
-function meOf(name) {
-  const r = statsFor('today')[name] || { games: 0, win: 0, ok: 0, bad: 0 };
-  const today = todayStr(Date.now()), cnt = {};
-  S.miss.forEach(x => { if (x.name === name && todayStr(x.time) === today) cnt[x.type] = (cnt[x.type] || 0) + 1; });
-  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
-  return { games: r.games, win: r.win, ok: r.ok, bad: r.bad, top: top ? top[0] : null, topN: top ? top[1] : 0 };
-}
-function sendMis(name, newDone) {
-  const devs = devsOf(name); if (!devs.length) return;
-  const M = misToday(), r = misRow(name);
-  const list = M.ids.filter(id => MIS[id]).map(id => ({ id, nm: MIS[id].nm, n: MIS[id].n, p: r.c[MIS[id].k] || 0, ok: !!r.done[id] }));
-  const msg = { t: 'mis', list, pt: S.pt.on ? S.pt.mis : 0, all: S.pt.on ? S.pt.misAll : 0, me: meOf(name), newDone: newDone || [] };
-  devs.forEach(st => st.conn.send(msg));
-}
-function renderMisTable() {
-  const el = $('#misBody'); if (!el) return;
-  const M = misToday();
-  $('#misHead').innerHTML = '<th>이름</th>' + M.ids.map(id => `<th>${esc(MIS[id].nm)}</th>`).join('') + '<th>모두</th>';
-  const names = [...new Set([...students.values()].map(s => s.name).concat(Object.keys(M.by)))].sort((a, b) => a.localeCompare(b, 'ko'));
-  el.innerHTML = names.map(n => { const r = M.by[n] || { c: {}, done: {} }; return `<tr><td><b>${esc(n)}</b></td>${M.ids.map(id => `<td>${r.done[id] ? '✅' : `${Math.min(r.c[MIS[id].k] || 0, MIS[id].n)}/${MIS[id].n}`}</td>`).join('')}<td>${r.all ? '🎉' : ''}</td></tr>`; }).join('') || `<tr><td colspan="${M.ids.length + 2}" class="sub">아직 학생이 없어요.</td></tr>`;
 }
 
 /* ---------- ✋ 손든 학생 ---------- */
@@ -597,7 +522,6 @@ function ruleAns(st, m) {
   if (st.name in g.ruled) return;
   const ok = m.a === g.dir; g.ruled[st.name] = ok;
   if (ok && S.pt.on && S.pt.rule) { const d = addPts(st.name, S.pt.rule, '규칙 고르기 정답'); notify(st.name, d, '규칙 고르기 정답'); }
-  if (ok) misBump(st.name, { rule: 1 });
   save(); renderPoints(); renderStudents();
 }
 function addMiss(st, m) {
@@ -606,7 +530,7 @@ function addMiss(st, m) {
   if (m.id && S.miss.some(x => x.id === m.id && x.name === st.name)) return;
   S.miss.push({ id: m.id || null, time: Date.now(), name: st.name, said: { x: s.x, y: s.y }, tapped: { x: t.x, y: t.y }, type: CoordKit.missType(s, t), kind: m.kind === 'read' ? 'read' : 'plot' });
   if (S.miss.length > 3000) S.miss.splice(0, S.miss.length - 3000);
-  save(); renderHelp(); sendMis(st.name);
+  save(); renderHelp();
 }
 const HELP_N = 3;
 function helpRows() {
@@ -711,7 +635,7 @@ function bind() {
     $$('[data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
     if (b.dataset.tab === 'records') renderRecords();
     if (b.dataset.tab === 'quiz') renderQuiz();
-    if (b.dataset.tab === 'points') { renderPoints(); renderMisTable(); }
+    if (b.dataset.tab === 'points') renderPoints();
     if (b.dataset.tab === 'help') renderHelp();
   });
   $('#btnCopy').onclick = async () => {
@@ -740,7 +664,6 @@ function bind() {
     const r = addPts(n, d, '선생님 조정'); save(); renderPoints(); renderStudents(); notify(n, r || 0, '선생님 조정');
   });
   $('#handList').addEventListener('click', e => { const b = e.target.closest('[data-hand]'); if (b) handDone(b.dataset.hand); });
-  $('#btnMisNew').onclick = () => { if (!confirm('오늘의 미션을 새로 뽑을까요? 학생들의 오늘 미션 진행은 처음부터 다시 세요.')) return; S.mis = null; misToday(); renderMisTable(); for (const st of students.values()) if (st.on) sendMis(st.name); };
   $('#helpList').addEventListener('click', e => { const b = e.target.closest('[data-helped]'); if (!b) return; S.helped[b.dataset.helped] = Date.now(); save(); renderHelp(); });
   $('#btnBigPts').onclick = () => { bigPts = true; renderBigPts(); };
   $('#bigPts').onclick = () => { bigPts = false; renderBigPts(); };
