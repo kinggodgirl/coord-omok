@@ -157,6 +157,23 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 .ptline .note b{font-size:inherit}
 .misstip{display:block;font-size:15px;font-weight:400;margin-top:4px}
 #earnOv{z-index:60}
+u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decoration-thickness:2px;text-underline-offset:3px;color:var(--accent2);cursor:pointer}
+#glossOv{z-index:95}
+#glossOv .card{max-width:460px;font-size:19px;line-height:1.6}
+#glossOv .w{font-size:24px;font-weight:900;color:var(--accent2);margin-bottom:6px}
+#btnHand{min-height:38px;padding:0 12px;font-size:16px;border-radius:99px;border-width:1.5px}
+#btnHand.on{background:var(--accent);border-color:var(--accent);color:#fff;animation:wiggle 1.6s ease-in-out infinite}
+.mis{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.mis li{display:flex;align-items:center;gap:10px;font-size:17px;padding:6px 10px;border-radius:12px;background:#f6f4ee}
+.mis li.ok{background:#e5f4ea;color:var(--ok);font-weight:700}
+.mis .ck{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;background:#fff}
+.mis li.ok .ck{border-color:var(--ok);background:var(--ok);color:#fff}
+.mis .pg{margin-left:auto;font-size:15px;color:var(--muted);font-weight:700}
+.me{font-size:16px;line-height:1.6}
+.me .tip{margin-top:6px;background:#fbe9e5;border-radius:10px;padding:6px 10px}
+.cf{position:fixed;top:-20px;width:10px;height:16px;z-index:96;pointer-events:none;border-radius:2px;animation:cf 2.4s cubic-bezier(.2,.6,.4,1) forwards}
+@keyframes cf{to{transform:translate(var(--dx),110vh) rotate(var(--r));opacity:.9}}
+@media (prefers-reduced-motion:reduce){.cf{display:none}#btnHand.on{animation:none}}
 #verBar{background:var(--accent);color:#fff;text-align:center;padding:8px;font-weight:700}
 @keyframes pop{0%{transform:scale(.3);opacity:.2}70%{transform:scale(1.12)}100%{transform:scale(1)}}
 .pop{animation:pop .35s ease-out;transform-box:fill-box;transform-origin:center}
@@ -168,7 +185,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 <div id="verBar" class="hidden">새 버전이 있어요. 화면을 새로고침해 주세요. <button class="btn sm" onclick="location.reload()">새로고침</button></div>
 <header>
   <h1>좌표평면 오목</h1><span class="sp"></span>
-  <div id="hdrInfo"><span id="hdrPts" class="hidden"></span><span id="hdrName"></span><span id="hdrRoom"></span><span class="dot" id="hdrDot" title="수업 연결"></span></div>
+  <div id="hdrInfo"><button class="btn hidden" id="btnHand" title="선생님께 도움 요청">✋ 도와주세요</button><span id="hdrPts" class="hidden"></span><span id="hdrName"></span><span id="hdrRoom"></span><span class="dot" id="hdrDot" title="수업 연결"></span></div>
 </header>
 
 <!-- 수업 들어가기 -->
@@ -201,6 +218,8 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
       <button class="btn" id="btnCpu2">우리 조(2명) vs 컴퓨터</button>
       <div id="homePts" class="ptline hidden"></div>
       <button class="btn hidden" id="btnEarn">🪙 좌표 문제 풀고 포인트 받기</button>
+      <div id="misCard" class="card hidden"></div>
+      <div id="meCard" class="card hidden"></div>
     </div>
     <div id="homeDemo" class="menu hidden">
       <div class="row" id="demoN"><button class="btn sm pri" data-n="4">4목</button><button class="btn sm" data-n="5">5목</button></div>
@@ -219,6 +238,7 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
         <li id="ruleLv"></li>
         <li id="ruleAlt"><b>번갈아 부르기</b>: 우리 조 차례가 끝날 때마다 말하는 사람과 찍는 사람이 서로 바뀌어요.</li>
       </ol>
+      <div class="note" style="margin-top:8px">📖 <span id="glossChips"></span></div>
     </div>
     <div style="text-align:center"><button class="link" id="btnSolo">🤖 혼자 연습하기 (좌표만 골라서 컴퓨터와 대결)</button></div>
   </div>
@@ -281,11 +301,12 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 <div id="pauseOv" class="ov hidden"><div class="card"><div style="font-size:60px">✋</div><div id="pauseMsg">선생님을 봐 주세요</div></div></div>
 <!-- 연결 끊김 잠금 -->
 <div id="lockOv" class="ov hidden"><div class="card" style="text-align:center;display:grid;gap:14px"><div style="font-size:26px;font-weight:900">선생님과 연결이 끊겼어요</div><div class="sub" id="lockMsg">다시 연결하는 중…</div><button class="btn pri" id="btnRelock">다시 연결</button></div></div>
+<div id="glossOv" class="ov hidden"><div class="card"><div class="w" id="glossW"></div><div id="glossD"></div><p class="sub" style="font-size:15px;margin-top:10px">화면을 누르면 닫혀요</p></div></div>
 <div id="toast" class="hidden"></div>
 
 <script>
 'use strict';
-const APP_VER = 8, R = 5;
+const APP_VER = 9, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -319,7 +340,29 @@ function toast(msg, bad, ms) {
   const t = $('#toast'); t.textContent = msg; t.className = bad ? 'bad' : ''; clearTimeout(toastT);
   toastT = setTimeout(() => t.classList.add('hidden'), ms || 2600);
 }
-function hdr() { $('#hdrName').textContent = myName || ''; $('#hdrDot').classList.toggle('on', ST.classOk || DEMO); }
+function hdr() { $('#hdrName').textContent = myName || ''; $('#hdrDot').classList.toggle('on', ST.classOk || DEMO); $('#btnHand').classList.toggle('hidden', !ST.classOk || DEMO); }
+/* ✋ 손들기 (한 걸음 수학): 누르면 선생님 화면 '도울 학생'에 바로 뜸, 다시 누르면 내림 */
+function setHand(on, byTeacher) {
+  ST.hand = !!on;
+  const b = $('#btnHand'); b.classList.toggle('on', ST.hand); b.textContent = ST.hand ? '✋ 손 들었어요' : '✋ 도와주세요';
+  if (byTeacher) toast('선생님이 확인했어요 🙂', false, 2500);
+  else sendT({ t: 'hand', on: ST.hand });
+  if (!byTeacher && ST.hand) toast('선생님께 알렸어요. 다시 누르면 손을 내려요.', false, 2500);
+}
+/* 📖 낱말 사전 */
+function showGloss(w) { const d = CoordKit.GLOSS[w]; if (!d) return; $('#glossW').textContent = w; $('#glossD').innerHTML = CoordKit.glossify(esc(d)).replace(/<u class="gl" data-g="([^"]+)">([^<]+)<\/u>/g, (m0, k, t) => k === w ? t : m0); $('#glossOv').classList.remove('hidden'); }
+/* 🎉 색종이 (한 걸음 수학 축하 연출) */
+function confetti() {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cols = ['#d2452f', '#1f4e8c', '#1d7a46', '#e8c74a', '#16181c', '#ff8fb1'];
+  for (let i = 0; i < 70; i++) {
+    const d = document.createElement('i'); d.className = 'cf';
+    d.style.left = Math.random() * 100 + 'vw'; d.style.background = cols[i % cols.length];
+    d.style.setProperty('--dx', (Math.random() * 200 - 100) + 'px'); d.style.setProperty('--r', (Math.random() * 1080 - 540) + 'deg');
+    d.style.animationDelay = (Math.random() * 0.4) + 's';
+    document.body.appendChild(d); setTimeout(() => d.remove(), 3000);
+  }
+}
 
 /* ---------- 수업(교사) 연결 : Firebase (fbnet.js) ----------
    omok/{수업 코드}/…  교사 화면이 hub를 차지하고, 학생은 up으로 보내고 dm·down으로 받음
@@ -365,6 +408,7 @@ function classUp() {
   setDiag(3, 'ok', ''); ST.classOk = true; everConnected = true; hdr();
   clearTimeout(lockT); clearTimeout(diagT); $('#lockOv').classList.add('hidden');
   hub.send({ t: 'hi', name: myName, dev: DEV, status: ST.status || '처음 화면', ver: APP_VER });
+  if (ST.hand) hub.send({ t: 'hand', on: true });
   if (!$('#scr-join').classList.contains('hidden')) goHome(); else refreshHome();
 }
 function classLost() {
@@ -398,6 +442,8 @@ function onTeacher(m) {
     case 'points': gotPoints(m); break;
     case 'earnQ': openEarn(m); break;
     case 'earnRes': earnResult(m); break;
+    case 'mis': ST.mis = m; refreshHome(); if (m.newDone && m.newDone.length) { confetti(); toast('🎯 오늘의 미션 완료! ' + m.newDone.join(', '), false, 3500); } break;
+    case 'handOff': setHand(false, true); break;
     case 'earnNo': ST.earnWait = false; refreshHome(); toast(m.msg || '지금은 풀 수 없어요', true); break;
   }
 }
@@ -438,7 +484,7 @@ function ptsLine() { const l = UI.lastPts; return l ? `<div class="ptline">${esc
 /* 충전 문제 (선생님 화면이 문제를 만들고 채점) */
 function askEarn() { if (!ST.classOk || ST.earnWait) return; ST.earnWait = true; refreshHome(); sendT({ t: 'earnReq' }); setTimeout(() => { ST.earnWait = false; refreshHome(); }, 4000); }
 function openEarn(m) { ST.earnWait = false; ST.earn = { id: m.id, q: m.q, fig: m.fig, options: m.options, my: null, res: null }; drawEarn(); $('#earnOv').classList.remove('hidden'); refreshHome(); }
-function earnResult(m) { if (!ST.earn || ST.earn.id !== m.id) return; ST.earn.res = m; if (Number.isFinite(m.bal)) { ST.bal = m.bal; hdrPts(); } drawEarn(); refreshHome(); }
+function earnResult(m) { if (!ST.earn || ST.earn.id !== m.id) return; ST.earn.res = m; if (m.ok) confetti(); if (Number.isFinite(m.bal)) { ST.bal = m.bal; hdrPts(); } drawEarn(); refreshHome(); }
 function drawEarn() {
   const z = ST.earn; if (!z) return;
   let h = `<p style="font-weight:900;color:#8a6d00;margin:0 0 6px">🪙 충전 문제 · 맞히면 +${ST.pt ? ST.pt.earn : 0}점</p><p class="q" style="font-weight:900;font-size:22px;margin:0 0 10px">${esc(z.q).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>')}</p>`;
@@ -450,7 +496,7 @@ function drawEarn() {
     return `<button data-i="${i}" class="${cls}" ${z.my != null ? 'disabled' : ''}><span class="m">${esc(o)}</span></button>`;
   }).join('') + '</div>';
   if (z.res) {
-    h += `<div class="box" style="margin-top:10px;font-size:17px"><b>${z.res.ok ? `⭕ 정답! +${z.res.d}점` : '❌ 아쉬워요'}</b><br>${esc(z.res.explain || '')}</div><div class="row" style="margin-top:10px">`;
+    h += `<div class="box" style="margin-top:10px;font-size:17px"><b>${z.res.ok ? `⭕ 정답! +${z.res.d}점` : '❌ 아쉬워요'}</b><br>${CoordKit.glossify(esc(z.res.explain || ''))}</div><div class="row" style="margin-top:10px">`;
     if (z.res.more) h += '<button class="btn pri" id="btnEarnMore">한 문제 더</button>';
     h += '<button class="btn" id="btnEarnClose">닫기</button></div>';
   } else if (z.my != null) h += '<p class="sub" style="margin-top:10px">채점하는 중…</p>';
@@ -483,6 +529,21 @@ function refreshHome() {
   const P = ST.pt, pon = ptOn() && !DEMO && ST.bal != null;
   $('#homePts').classList.toggle('hidden', !pon);
   if (pon) $('#homePts').innerHTML = `💰 내 포인트 <b>${ST.bal}</b>점<div class="note" style="margin-top:4px">맞게 찍기 +${P.place} · 대전(2:2·1:1) 승리 +${P.win}${P.draw ? ` · 무승부 +${P.draw}` : ''} · 컴퓨터 이기기 +${P.cpuWin} · 좌표 퀴즈 정답 +${P.quiz}${P.bet ? ` · <b>판돈 ${P.bet}점</b>(진 조가 이긴 조에게)` : ''} · 같은 사람들끼리 ${P.streak}판 넘게 연속이면 승리 점수 없음</div>`;
+  const mi = ST.mis, showMis = !DEMO && ok && mi && mi.list && mi.list.length;
+  $('#misCard').classList.toggle('hidden', !showMis);
+  if (showMis) {
+    const done = mi.list.filter(x => x.ok).length;
+    $('#misCard').innerHTML = `<b>🎯 오늘의 미션</b> <span class="note">${done}/${mi.list.length}${done === mi.list.length ? ' · 다 했어요! 🎉' : mi.pt ? ` · 하나에 +${mi.pt}점, 모두 하면 보너스 +${mi.all}점` : ''}</span><ol class="mis">` +
+      mi.list.map(x => `<li class="${x.ok ? 'ok' : ''}"><span class="ck">${x.ok ? '✓' : ''}</span><span>${esc(x.nm)}</span><span class="pg">${Math.min(x.p, x.n)}/${x.n}</span></li>`).join('') + '</ol>';
+  }
+  const me = mi && mi.me, showMe = !DEMO && ok && me && (me.games || me.ok || me.bad);
+  $('#meCard').classList.toggle('hidden', !showMe);
+  if (showMe) {
+    let h = `<b>🪞 나의 오늘</b><div class="me">대전 ${me.games}판 (${me.win}승) · 맞게 찍기·읽기 <b>${me.ok}</b>번 · 실수 <b>${me.bad}</b>번${me.ok + me.bad ? ` · 정확도 <b>${Math.round(100 * me.ok / (me.ok + me.bad))}%</b>` : ''}`;
+    if (me.top && CoordKit.MISS[me.top]) h += `<div class="tip">가장 많이 한 실수: <b>${CoordKit.MISS[me.top].name}</b> (${me.topN}번)<br>💡 ${CoordKit.glossify(esc(CoordKit.MISS[me.top].tip))}</div>`;
+    else if (me.ok >= 3 && !me.bad) h += '<div style="color:var(--ok);font-weight:700">오늘은 실수 없이 잘하고 있어요! 👍</div>';
+    $('#meCard').innerHTML = h + '</div>';
+  }
   const canEarn = pon && P.earn > 0 && ST.bal < P.refill;
   $('#btnEarn').classList.toggle('hidden', !canEarn);
   $('#btnEarn').disabled = !ok || !!ST.earnWait || !!ST.earn;
@@ -1093,7 +1154,7 @@ function showResult(v, mine) {
   const myTeam = mine.length ? mine[0][0] : null;
   let h = '';
   if (v.winner === 'draw') h += '<h2>무승부!</h2>';
-  else h += `<h2>${stoneHTML(v.winner)} ${TEAM[v.winner]} 승리!</h2>` + (myTeam ? `<p class="sub" style="font-size:18px">${myTeam === v.winner ? '축하해요! 🎉' : '아쉬워요. 역할을 바꿔서 다시 도전!'}</p>` : '');
+  else h += `<h2>${stoneHTML(v.winner)} ${TEAM[v.winner]} 승리!</h2>` + (myTeam && myTeam === v.winner && v.mode !== 'demo' ? (setTimeout(confetti, 50), '') : '') + (myTeam ? `<p class="sub" style="font-size:18px">${myTeam === v.winner ? '축하해요! 🎉' : '아쉬워요. 역할을 바꿔서 다시 도전!'}</p>` : '');
   if (v.line) {
     const L = v.line, dx = L[1].x - L[0].x, dy = L[1].y - L[0].y;
     const hint = dy === 0 ? '모든 점의 <i class="m">y</i>좌표가 같아요. (가로줄)' : dx === 0 ? '모든 점의 <i class="m">x</i>좌표가 같아요. (세로줄)'
@@ -1129,6 +1190,7 @@ function showResult(v, mine) {
     if (UI.ruleAns && UI.ruleAns.round === v.round) return;
     const a = Number(b.dataset.r);
     UI.ruleAns = { round: v.round, a };
+    if (a === lineDir(v.line)) confetti();
     if (mine.length && v.gid && v.mode !== 'solo' && v.mode !== 'demo') sendT({ t: 'rule', gid: v.gid, a });
     showResult(curView() || v, curMine());
   });
@@ -1159,7 +1221,7 @@ function drawQuiz() {
     else if (i === z.my) cls = 'pick';
     return `<button data-i="${i}" class="${cls}" ${z.my != null || z.reveal ? 'disabled' : ''}><span class="m">${esc(o)}</span></button>`;
   }).join('') + '</div>';
-  if (z.reveal) h += `<div class="box" style="margin-top:10px;font-size:17px"><b>${z.my === z.reveal.answer ? '⭕ 정답!' : (z.my == null ? '정답은 초록색이에요' : '❌ 아쉬워요')}</b><br>${esc(z.reveal.explain || '')}</div>`;
+  if (z.reveal) h += `<div class="box" style="margin-top:10px;font-size:17px"><b>${z.my === z.reveal.answer ? '⭕ 정답!' : (z.my == null ? '정답은 초록색이에요' : '❌ 아쉬워요')}</b><br>${CoordKit.glossify(esc(z.reveal.explain || ''))}</div>`;
   else if (z.my != null) h += '<p class="sub" style="margin-top:10px">제출했어요. 선생님이 정답을 공개할 때까지 기다려요.</p>';
   $('#quizCard').innerHTML = h;
   $$('#quizCard .opts button').forEach(b => b.onclick = () => {
@@ -1167,7 +1229,7 @@ function drawQuiz() {
     ST.quiz.my = Number(b.dataset.i); sendT({ t: 'quizAns', qid: ST.quiz.qid, a: ST.quiz.my }); drawQuiz();
   });
 }
-function revealQuiz(m) { if (!ST.quiz || m.qid !== ST.quiz.qid) return; ST.quiz.reveal = { answer: m.answer, explain: m.explain }; drawQuiz(); }
+function revealQuiz(m) { if (!ST.quiz || m.qid !== ST.quiz.qid) return; const first = !ST.quiz.reveal; ST.quiz.reveal = { answer: m.answer, explain: m.explain }; drawQuiz(); if (first && ST.quiz.my === m.answer) confetti(); }
 function closeQuiz() { ST.quiz = null; $('#quizOv').classList.add('hidden'); }
 
 /* ---------- 이벤트 연결 ---------- */
@@ -1181,6 +1243,11 @@ function bind() {
   $('#inRoom').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom($('#inRoom').value.trim()); });
   $('#btnSolo').onclick = () => startLocal('solo');
   $('#btnEarn').onclick = askEarn;
+  $('#btnHand').onclick = () => setHand(!ST.hand);
+  document.addEventListener('click', e => { const g = e.target.closest('u.gl'); if (g) { e.preventDefault(); e.stopPropagation(); showGloss(g.dataset.g); } }, true);
+  $('#glossOv').onclick = () => $('#glossOv').classList.add('hidden');
+  $('#glossChips').innerHTML = '낱말 사전: ' + Object.keys(CoordKit.GLOSS).map(w => `<u class="gl" data-g="${w}">${w}</u>`).join(' · ');
+  const rl = $('.rules ol'); rl.innerHTML = CoordKit.glossify(rl.innerHTML);
   $('#btnDemo').onclick = () => startLocal('demo');
   $$('#demoL button').forEach(b => b.onclick = () => { ST.settings.luck = b.dataset.l; $$('#demoL button').forEach(x => x.classList.toggle('pri', x === b)); refreshHome(); });
   $$('#demoN button').forEach(b => b.onclick = () => { ST.settings.n = Number(b.dataset.n); $$('#demoN button').forEach(x => x.classList.toggle('pri', x === b)); refreshHome(); });
