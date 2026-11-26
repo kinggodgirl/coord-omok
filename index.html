@@ -163,14 +163,6 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
 #glossOv .w{font-size:24px;font-weight:900;color:var(--accent2);margin-bottom:6px}
 #btnHand{min-height:38px;padding:0 12px;font-size:16px;border-radius:99px;border-width:1.5px}
 #btnHand.on{background:var(--accent);border-color:var(--accent);color:#fff;animation:wiggle 1.6s ease-in-out infinite}
-.mis{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
-.mis li{display:flex;align-items:center;gap:10px;font-size:17px;padding:6px 10px;border-radius:12px;background:#f6f4ee}
-.mis li.ok{background:#e5f4ea;color:var(--ok);font-weight:700}
-.mis .ck{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;background:#fff}
-.mis li.ok .ck{border-color:var(--ok);background:var(--ok);color:#fff}
-.mis .pg{margin-left:auto;font-size:15px;color:var(--muted);font-weight:700}
-.me{font-size:16px;line-height:1.6}
-.me .tip{margin-top:6px;background:#fbe9e5;border-radius:10px;padding:6px 10px}
 .cf{position:fixed;top:-20px;width:10px;height:16px;z-index:96;pointer-events:none;border-radius:2px;animation:cf 2.4s cubic-bezier(.2,.6,.4,1) forwards}
 @keyframes cf{to{transform:translate(var(--dx),110vh) rotate(var(--r));opacity:.9}}
 @media (prefers-reduced-motion:reduce){.cf{display:none}#btnHand.on{animation:none}}
@@ -218,8 +210,6 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
       <button class="btn" id="btnCpu2">우리 조(2명) vs 컴퓨터</button>
       <div id="homePts" class="ptline hidden"></div>
       <button class="btn hidden" id="btnEarn">🪙 좌표 문제 풀고 포인트 받기</button>
-      <div id="misCard" class="card hidden"></div>
-      <div id="meCard" class="card hidden"></div>
     </div>
     <div id="homeDemo" class="menu hidden">
       <div class="row" id="demoN"><button class="btn sm pri" data-n="4">4목</button><button class="btn sm" data-n="5">5목</button></div>
@@ -306,7 +296,7 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
 
 <script>
 'use strict';
-const APP_VER = 9, R = 5;
+const APP_VER = 10, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -442,7 +432,6 @@ function onTeacher(m) {
     case 'points': gotPoints(m); break;
     case 'earnQ': openEarn(m); break;
     case 'earnRes': earnResult(m); break;
-    case 'mis': ST.mis = m; refreshHome(); if (m.newDone && m.newDone.length) { confetti(); toast('🎯 오늘의 미션 완료! ' + m.newDone.join(', '), false, 3500); } break;
     case 'handOff': setHand(false, true); break;
     case 'earnNo': ST.earnWait = false; refreshHome(); toast(m.msg || '지금은 풀 수 없어요', true); break;
   }
@@ -529,21 +518,6 @@ function refreshHome() {
   const P = ST.pt, pon = ptOn() && !DEMO && ST.bal != null;
   $('#homePts').classList.toggle('hidden', !pon);
   if (pon) $('#homePts').innerHTML = `💰 내 포인트 <b>${ST.bal}</b>점<div class="note" style="margin-top:4px">맞게 찍기 +${P.place} · 대전(2:2·1:1) 승리 +${P.win}${P.draw ? ` · 무승부 +${P.draw}` : ''} · 컴퓨터 이기기 +${P.cpuWin} · 좌표 퀴즈 정답 +${P.quiz}${P.bet ? ` · <b>판돈 ${P.bet}점</b>(진 조가 이긴 조에게)` : ''} · 같은 사람들끼리 ${P.streak}판 넘게 연속이면 승리 점수 없음</div>`;
-  const mi = ST.mis, showMis = !DEMO && ok && mi && mi.list && mi.list.length;
-  $('#misCard').classList.toggle('hidden', !showMis);
-  if (showMis) {
-    const done = mi.list.filter(x => x.ok).length;
-    $('#misCard').innerHTML = `<b>🎯 오늘의 미션</b> <span class="note">${done}/${mi.list.length}${done === mi.list.length ? ' · 다 했어요! 🎉' : mi.pt ? ` · 하나에 +${mi.pt}점, 모두 하면 보너스 +${mi.all}점` : ''}</span><ol class="mis">` +
-      mi.list.map(x => `<li class="${x.ok ? 'ok' : ''}"><span class="ck">${x.ok ? '✓' : ''}</span><span>${esc(x.nm)}</span><span class="pg">${Math.min(x.p, x.n)}/${x.n}</span></li>`).join('') + '</ol>';
-  }
-  const me = mi && mi.me, showMe = !DEMO && ok && me && (me.games || me.ok || me.bad);
-  $('#meCard').classList.toggle('hidden', !showMe);
-  if (showMe) {
-    let h = `<b>🪞 나의 오늘</b><div class="me">대전 ${me.games}판 (${me.win}승) · 맞게 찍기·읽기 <b>${me.ok}</b>번 · 실수 <b>${me.bad}</b>번${me.ok + me.bad ? ` · 정확도 <b>${Math.round(100 * me.ok / (me.ok + me.bad))}%</b>` : ''}`;
-    if (me.top && CoordKit.MISS[me.top]) h += `<div class="tip">가장 많이 한 실수: <b>${CoordKit.MISS[me.top].name}</b> (${me.topN}번)<br>💡 ${CoordKit.glossify(esc(CoordKit.MISS[me.top].tip))}</div>`;
-    else if (me.ok >= 3 && !me.bad) h += '<div style="color:var(--ok);font-weight:700">오늘은 실수 없이 잘하고 있어요! 👍</div>';
-    $('#meCard').innerHTML = h + '</div>';
-  }
   const canEarn = pon && P.earn > 0 && ST.bal < P.refill;
   $('#btnEarn').classList.toggle('hidden', !canEarn);
   $('#btnEarn').disabled = !ok || !!ST.earnWait || !!ST.earn;
