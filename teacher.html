@@ -333,7 +333,7 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
     <div class="ptcols">
       <div>
         <div class="ptgrid" id="ptGrid"></div>
-        <p class="sub" style="margin-top:10px;line-height:1.6">판돈: 진 조가 이긴 조에게 줘요. 걸리는 점수는 [판돈]과 네 명 중 가장 적게 가진 사람의 점수 중 작은 쪽(제로섬). 같은 사람들끼리 연속으로 [연속 제한]판을 넘게 하면 승리 점수와 판돈이 없어요(맞게 찍기 점수는 그대로). 혼자 연습은 포인트가 없어요. 장부는 이 컴퓨터 브라우저에 저장되고 백업 파일에도 들어가요.</p>
+        <p class="sub" style="margin-top:10px;line-height:1.6"><b>💰 서로 베팅</b>: 대전(2:2·1:1) 대기실에서 각자 걸 점수를 골라요(한 판 최대·가진 포인트까지). <b>고른 점수 중 가장 작은 점수</b>로 겨루고, 진 쪽 한 사람마다 이긴 쪽 한 사람에게 그만큼 줘요(비기면 그대로). 포인트가 새로 생기지 않아 짜고 쳐도 늘지 않아요. 같은 사람들끼리 [연속]판을 넘으면 그 판은 연습 경기예요. 컴퓨터전·혼자 연습·퀴즈는 포인트가 없어요.<br><b>🪙 충전 문제</b>: 포인트가 기준 이하가 되면 학생 첫 화면에 좌표 문제 버튼이 떠요. 문제는 이 화면이 만들고 채점해요(4초 간격).<br>장부는 이 컴퓨터 브라우저에 저장되고 백업 파일에도 들어가요.</p>
         <h3 style="margin-top:12px">최근 포인트 기록</h3><div class="log" id="ptLog"></div>
       </div>
       <div class="scroll" style="max-height:520px"><table><thead><tr><th class="num">순위</th><th>이름</th><th class="num">포인트</th><th class="num">오늘 변화</th><th>조정</th></tr></thead><tbody id="ptBody"></tbody></table></div>
@@ -400,7 +400,7 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
 
 <script>
 'use strict';
-const APP_VER = 11;
+const APP_VER = 12;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mathify = s => esc(s).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>');
@@ -421,8 +421,10 @@ const S = Object.assign({
   slide: 0, slEdit: {}, ask: null, hideNames: true
 }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
 S.settings = Object.assign({ n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, S.settings);
-const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, rule: 2, bet: 0, streak: 3, refill: 10, earn: 2 };
-S.pt = Object.assign({}, PT_DEF, S.pt);
+/* 포인트 = 서로 베팅 + 충전 문제만 (v:2). 예전 기준(맞게 찍기·승리 점수 등)이 저장돼 있으면 새 기본값으로 바꿈 */
+const PT_DEF = { v: 2, on: true, start: 100, max: 50, streak: 3, refill: 60, earn: 50 };
+S.pt = (S.pt && S.pt.v === 2) ? Object.assign({}, PT_DEF, S.pt) : Object.assign({}, PT_DEF, S.pt ? { on: S.pt.on !== false, start: Number.isFinite(S.pt.start) ? S.pt.start : 100 } : {});
+Object.keys(S.pt).forEach(k => { if (!(k in PT_DEF)) delete S.pt[k]; });
 ['bal', 'run', 'helped', 'slEdit'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
 ['ptLog', 'miss', 'games', 'offline'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
 function save() { try { localStorage.setItem(LS, JSON.stringify({ code: S.code, settings: S.settings, pause: S.pause, games: S.games, quiz: S.quiz, offline: S.offline, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped, slide: S.slide, slEdit: S.slEdit, ask: S.ask, hideNames: S.hideNames })); } catch (e) { } }
@@ -640,7 +642,7 @@ function renderStudents() {
 /* ---------- 기록 ---------- */
 function addGame(m) {
   if (!m.gid || S.games.some(g => g.gid === m.gid)) return;
-  const players = (m.players || []).slice(0, 4).map(p => ({ name: String(p.name).slice(0, 10), team: p.team === 'B' ? 'B' : 'A', role: ['c', 'p', 'cp'].includes(p.role) ? p.role : 'cp', calls: Math.max(0, p.calls | 0), ok: Math.max(0, p.ok | 0), bad: Math.max(0, p.bad | 0) }));
+  const players = (m.players || []).slice(0, 4).map(p => ({ name: String(p.name).slice(0, 10), team: p.team === 'B' ? 'B' : 'A', role: ['c', 'p', 'cp'].includes(p.role) ? p.role : 'cp', calls: Math.max(0, p.calls | 0), ok: Math.max(0, p.ok | 0), bad: Math.max(0, p.bad | 0), bet: Math.max(0, Math.min(999, p.bet | 0)) }));
   const g = { gid: String(m.gid), time: Date.now(), mode: MODE[m.mode] ? m.mode : 'online', n: m.n === 5 ? 5 : 4, winner: ['A', 'B', 'draw'].includes(m.winner) ? m.winner : 'draw', moves: m.moves | 0, players, cpuTeam: m.cpuTeam || null, dir: [0, 1, 2, 3].includes(m.dir) ? m.dir : null, level: ['low', 'mid', 'high'].includes(m.level) ? m.level : 'mid' };
   S.games.push(g);
   awardGame(g);
@@ -664,7 +666,7 @@ function renderRecords() {
   const today = todayStr(Date.now());
   const gs = S.games.filter(g => range === 'all' || todayStr(g.time) === today).slice().reverse();
   $('#gameCount').textContent = gs.length + '경기';
-  $('#gameBody').innerHTML = gs.map(g => `<tr><td>${new Date(g.time).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td><td>${MODE[g.mode]}</td><td>${g.n}목</td><td>${teamNames(g, 'A')}</td><td>${teamNames(g, 'B')}</td><td>${g.winner === 'draw' ? '무승부' : TEAM[g.winner] + ' 승'}</td><td class="num">${g.moves}</td><td class="sub">${g.pts ? Object.entries(g.pts).map(([n, d]) => esc(n) + ' ' + (d > 0 ? '+' : '') + d).join(', ') + (g.stake ? ` (판돈 ${g.stake})` : '') + (g.over ? ' · 연속 제한' : '') : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="sub">기록이 없어요.</td></tr>';
+  $('#gameBody').innerHTML = gs.map(g => `<tr><td>${new Date(g.time).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td><td>${MODE[g.mode]}</td><td>${g.n}목</td><td>${teamNames(g, 'A')}</td><td>${teamNames(g, 'B')}</td><td>${g.winner === 'draw' ? '무승부' : TEAM[g.winner] + ' 승'}</td><td class="num">${g.moves}</td><td class="sub">${g.pts ? Object.entries(g.pts).map(([n, d]) => esc(n) + ' ' + (d > 0 ? '+' : '') + d).join(', ') + (g.stake ? ` (베팅 ${g.stake})` : '') + (g.over ? ' · 연속 제한' : '') : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="sub">기록이 없어요.</td></tr>';
 }
 function csv(rows) { return '﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n'); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/csv' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
@@ -672,11 +674,10 @@ const stamp = () => new Date().toISOString().slice(0, 10);
 
 /* ---------- 포인트 (장부는 이 화면이 원본) ---------- */
 const PT_FIELDS = [
-  ['start', '처음 지급', 0, 1000], ['place', '맞게 찍기·1:1 좌표 맞히기 1번', 0, 10], ['win', '대전 승리 (한 사람당)', 0, 50], ['draw', '대전 무승부', 0, 50],
-  ['cpuWin', '컴퓨터 이기기', 0, 50], ['quiz', '좌표 퀴즈 정답', 0, 50], ['rule', '판 끝 규칙 고르기 정답', 0, 20], ['bet', '판돈 (0이면 안 걺)', 0, 100], ['streak', '같은 사람들 연속 제한(판)', 1, 20],
-  ['refill', '충전 문제: 이 점수보다 적으면', 0, 1000], ['earn', '충전 문제 1개', 0, 20]
+  ['start', '처음 지급', 0, 1000], ['max', '💰 서로 베팅: 한 판 최대', 0, 500], ['streak', '💰 같은 사람들 연속 몇 판까지 베팅', 1, 20],
+  ['refill', '🪙 충전 문제: 이 점수 이하일 때 보임', 0, 1000], ['earn', '🪙 충전 문제 1개 맞히면', 0, 500]
 ];
-const publicPt = () => ({ on: S.pt.on, bet: S.pt.bet, place: S.pt.place, win: S.pt.win, draw: S.pt.draw, cpuWin: S.pt.cpuWin, quiz: S.pt.quiz, rule: S.pt.rule, refill: S.pt.refill, earn: S.pt.earn, streak: S.pt.streak });
+const publicPt = () => ({ on: S.pt.on, max: S.pt.max, streak: S.pt.streak, refill: S.pt.refill, earn: S.pt.earn });
 function bal(name) { if (!(name in S.bal)) S.bal[name] = S.pt.start; return S.bal[name]; }
 function addPts(name, d, why) {
   if (!d) return;
@@ -689,41 +690,27 @@ function addPts(name, d, why) {
 function devsOf(name) { return [...students.values()].filter(s => s.on && s.name === name); }
 function sendBal(st, extra) { if (!st || !S.pt.on) return; st.conn.send(Object.assign({ t: 'points', bal: bal(st.name) }, extra || {})); }
 function notify(name, d, why) { devsOf(name).forEach(st => sendBal(st, d ? { d, why } : null)); }
+/* 서로 베팅: 대전(2:2·1:1)에서 각자 고른 점수(최대·가진 포인트까지) 중 가장 작은 점수로, 진 쪽 한 사람마다 이긴 쪽 한 사람에게 (제로섬) */
 function awardGame(g) {
-  if (!S.pt.on || g.mode === 'solo') return;
+  if (!S.pt.on || !VS(g.mode)) return;
   const P = S.pt, names = [...new Set(g.players.map(p => p.name))];
   if (!names.length) return;
   const key = g.mode + ':' + names.slice().sort().join('|');   // 같은 사람들끼리 연속 몇 판째인지
   let over = false;
   names.forEach(n => { const r = S.run[n]; S.run[n] = (r && r.k === key) ? { k: key, n: r.n + 1 } : { k: key, n: 1 }; if (S.run[n].n > P.streak) over = true; });
   g.over = over;
-  const gain = {}, why = {};
-  const add = (n, d, w) => { if (!d) return; gain[n] = (gain[n] || 0) + d; (why[n] = why[n] || []).push(w + (d > 0 ? ' +' : ' ') + d); };
-  g.players.forEach(p => add(p.name, (p.ok || 0) * P.place, `맞게 찍기 ${p.ok}번`));
-  if (!over) {
-    if (VS(g.mode)) {
-      if (g.winner === 'draw') names.forEach(n => add(n, P.draw, '무승부'));
-      else {
-        g.players.filter(p => p.team === g.winner).forEach(p => add(p.name, P.win, '승리'));
-        const W = g.players.filter(p => p.team === g.winner), L = g.players.filter(p => p.team !== g.winner);
-        if (P.bet > 0 && W.length && W.length === L.length) {
-          const stake = Math.min(P.bet, ...g.players.map(p => bal(p.name)));
-          if (stake > 0) { W.forEach(p => add(p.name, stake, '판돈')); L.forEach(p => add(p.name, -stake, '판돈')); g.stake = stake; }
-        }
-      }
-    } else if (g.mode === 'cpu2' && g.winner && g.winner !== g.cpuTeam && g.winner !== 'draw') names.forEach(n => add(n, P.cpuWin, '컴퓨터 이김'));
-  }
-  g.pts = {};
-  names.forEach(n => {
-    const w = (why[n] || []).join(', ') + (over ? ` (같은 사람들과 ${S.run[n].n}판째라 승리 점수 없음)` : '');
-    const d = gain[n] ? addPts(n, gain[n], '경기 · ' + w) || 0 : 0;
-    g.pts[n] = d; notify(n, d, w || '이번 판 포인트 없음');
-  });
-}
-function awardQuiz(q) {
-  if (!S.pt.on || !q || q.paid) return;
-  q.paid = true;
-  Object.entries(q.answers).forEach(([n, a]) => { if (a === q.answer) { const d = addPts(n, S.pt.quiz, '좌표 퀴즈 정답'); notify(n, d, '좌표 퀴즈 정답'); } });
+  const W = g.players.filter(p => p.team === g.winner), L = g.players.filter(p => p.team !== g.winner);
+  const stake = Math.max(0, Math.min(P.max, ...g.players.map(p => Math.min(Math.max(0, p.bet | 0), bal(p.name)))));
+  g.stake = 0; g.pts = {};
+  let why;
+  if (over) why = `같은 사람들과 ${S.run[names[0]].n}판째라 연습 경기 (포인트 없음)`;
+  else if (g.winner === 'draw') why = '비겨서 포인트 그대로';
+  else if (!stake) why = '0점을 고른 사람이 있어 연습 경기 (포인트 없음)';
+  else if (!W.length || W.length !== L.length) why = '인원이 맞지 않아 포인트 없음';
+  if (why) { names.forEach(n => { g.pts[n] = 0; notify(n, 0, why); }); return; }
+  g.stake = stake;
+  W.forEach(p => { const d = addPts(p.name, stake, `베팅 ${stake}점 · 이김`) || 0; g.pts[p.name] = d; notify(p.name, d, `베팅 ${stake}점 · 이겼어요`); });
+  L.forEach(p => { const d = addPts(p.name, -stake, `베팅 ${stake}점 · 짐`) || 0; g.pts[p.name] = d; notify(p.name, d, `베팅 ${stake}점 · 졌어요`); });
 }
 
 /* ---------- ✋ 손든 학생 · 충전 문제 ---------- */
@@ -732,7 +719,7 @@ function handDone(name) { hands.delete(name); devsOf(name).forEach(st => st.conn
 const earnQ = {};   // name -> {id, answer, explain, t}  (이 화면이 문제를 만들고 답을 가지고 있다가 채점)
 function earnReq(st) {
   if (!S.pt.on || !S.pt.earn) return st.conn.send({ t: 'earnNo', msg: '지금은 충전 문제를 쓸 수 없어요.' });
-  if (bal(st.name) >= S.pt.refill) return st.conn.send({ t: 'earnNo', msg: `포인트가 ${S.pt.refill}점보다 적을 때만 풀 수 있어요.` });
+  if (bal(st.name) > S.pt.refill) return st.conn.send({ t: 'earnNo', msg: `포인트가 ${S.pt.refill}점 이하일 때만 풀 수 있어요.` });
   const old = earnQ[st.name];
   if (old && Date.now() - old.t < 4000) return st.conn.send({ t: 'earnNo', msg: '조금만 천천히! 4초 뒤에 다시 눌러 주세요.' });
   const q = CoordKit.makeQuiz('');
@@ -746,7 +733,7 @@ function earnAns(st, m) {
   const ok = m.a === e.answer;
   const d = ok ? (addPts(st.name, S.pt.earn, '충전 문제 정답') || 0) : 0;
   save(); renderPoints(); renderStudents();
-  devsOf(st.name).forEach(x => x.conn.send({ t: 'earnRes', id: m.id, ok, answer: e.answer, explain: e.explain, d, bal: bal(st.name), more: bal(st.name) < S.pt.refill }));
+  devsOf(st.name).forEach(x => x.conn.send({ t: 'earnRes', id: m.id, ok, answer: e.answer, explain: e.explain, d, bal: bal(st.name), more: bal(st.name) <= S.pt.refill }));
 }
 function todayDelta(name) { const t = todayStr(Date.now()); return S.ptLog.filter(l => l.name === name && todayStr(l.time) === t).reduce((a, l) => a + l.d, 0); }
 function ptNames() { const set = new Set(Object.keys(S.bal)); for (const s of students.values()) set.add(s.name); S.games.forEach(g => g.players.forEach(p => set.add(p.name))); return [...set]; }
@@ -782,7 +769,6 @@ function ruleAns(st, m) {   // 판 끝 규칙 고르기: 결과를 보낸 판(gi
   g.ruled = g.ruled || {};
   if (st.name in g.ruled) return;
   const ok = m.a === g.dir; g.ruled[st.name] = ok;
-  if (ok && S.pt.on && S.pt.rule) { const d = addPts(st.name, S.pt.rule, '규칙 고르기 정답'); notify(st.name, d, '규칙 고르기 정답'); }
   save(); renderPoints(); renderStudents();
 }
 function addMiss(st, m) {
@@ -1095,7 +1081,7 @@ function bind() {
     S.quiz = Object.assign({}, draft, { qid: 'q' + Date.now().toString(36), sent: true, revealed: false, answers: {} });
     draft = null; save(); broadcast({ t: 'quiz', quiz: publicQuiz() }); renderQuiz();
   };
-  $('#btnReveal').onclick = () => { if (!S.quiz) return; S.quiz.revealed = true; awardQuiz(S.quiz); save(); renderPoints(); renderStudents(); broadcast({ t: 'quizReveal', qid: S.quiz.qid, answer: S.quiz.answer, explain: S.quiz.explain }); renderQuiz(); };
+  $('#btnReveal').onclick = () => { if (!S.quiz) return; S.quiz.revealed = true; save(); renderPoints(); renderStudents(); broadcast({ t: 'quizReveal', qid: S.quiz.qid, answer: S.quiz.answer, explain: S.quiz.explain }); renderQuiz(); };
   $('#btnCloseQ').onclick = () => { broadcast({ t: 'quizClose' }); S.quiz = null; save(); renderQuiz(); };
   $('#btnBigQ').onclick = () => { bigQuiz = true; renderBigQuiz(); };
   $('#bigQuiz').onclick = () => { bigQuiz = false; renderBigQuiz(); };
@@ -1124,7 +1110,7 @@ function bind() {
       if (d.bal && typeof d.bal === 'object') {
         if (!Object.keys(S.bal).length || confirm('백업 파일의 포인트로 지금 포인트를 바꿀까요? (취소하면 지금 포인트를 그대로 둬요)')) {
           S.bal = {}; Object.entries(d.bal).forEach(([n, v]) => { if (Number.isFinite(+v)) S.bal[String(n).slice(0, 12)] = Math.max(0, Math.round(+v)); });
-          if (d.pt) S.pt = Object.assign({}, PT_DEF, d.pt);
+          if (d.pt && d.pt.v === 2) S.pt = Object.assign({}, PT_DEF, d.pt);
           if (Array.isArray(d.ptLog)) S.ptLog = d.ptLog.slice(-3000);
           if (d.run && typeof d.run === 'object') S.run = d.run;
           ptMsg = ', 포인트 ' + Object.keys(S.bal).length + '명';

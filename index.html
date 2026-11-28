@@ -157,6 +157,15 @@ details.hint{margin-top:6px;font-size:16px} details.hint summary{cursor:pointer;
 .mkrow .btn{padding:0 10px}
 #hdrPts{font-weight:900;color:var(--ink);background:#fff4d6;border:1.5px solid #e8c74a;border-radius:99px;padding:2px 10px}
 #hdrPts.bump{animation:pop .5s ease-out}
+.betbox{border:2px solid #e8c74a;background:#fffbea;margin-bottom:14px;text-align:center}
+.betbox .bt{font-weight:900;font-size:19px}
+.betbox .br{display:flex;align-items:center;justify-content:center;gap:12px;margin:10px 0}
+.betbox .br button{width:58px;height:58px;border-radius:14px;border:2px solid var(--ink);background:#fff;font-size:30px;font-weight:900}
+.betbox .bn{font-size:46px;font-weight:900;min-width:110px;color:#8a6d00}
+.betbox .qk{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.betbox .qk button{min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid var(--ink);background:#fff;font-size:17px;font-weight:700}
+.betbox .bst{margin-top:10px;font-size:17px}
+.seat .bet{font-size:15px;color:#8a6d00;font-weight:700;margin-top:2px}
 .ptline{margin-top:10px;background:#fff8d6;border:2px solid #e8c74a;border-radius:14px;padding:8px 12px;font-size:17px}
 .ptline b{font-size:22px}
 .ptline .note b{font-size:inherit}
@@ -246,6 +255,7 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
       <div class="roomcode"><span style="font-weight:700">방 코드</span><span class="code" id="lbCode">····</span><span class="sub" id="lbHint">친구들에게 알려 주세요</span></div>
       <div class="sub" id="lbInfo"></div>
     </div>
+    <div id="lbBet"></div>
     <div class="teams" id="lbTeams"></div>
     <div class="waiting" id="lbWait"></div>
     <div class="row">
@@ -303,7 +313,7 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
 
 <script>
 'use strict';
-const APP_VER = 11, R = 5;
+const APP_VER = 12, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -321,6 +331,7 @@ const rid = () => Date.now() + Math.random();
 
 const ST = { settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, paused: false, classOk: false, quiz: null, status: '', pt: null, bal: null, earn: null };
 let myName = localStorage.cgName || '';
+ST.myBet = localStorage.cgBet != null && Number.isFinite(+localStorage.cgBet) ? Math.max(0, +localStorage.cgBet | 0) : 10;
 
 /* ---------- 화면 공통 ---------- */
 function show(id) {
@@ -529,11 +540,11 @@ function refreshHome() {
   $('#btnSolo').classList.toggle('hidden', !DEMO && (!ST.settings.solo || !ok));
   const P = ST.pt, pon = ptOn() && !DEMO && ST.bal != null;
   $('#homePts').classList.toggle('hidden', !pon);
-  if (pon) $('#homePts').innerHTML = `💰 내 포인트 <b>${ST.bal}</b>점<div class="note" style="margin-top:4px">맞게 찍기 +${P.place} · 대전(2:2·1:1) 승리 +${P.win}${P.draw ? ` · 무승부 +${P.draw}` : ''} · 컴퓨터 이기기 +${P.cpuWin} · 좌표 퀴즈 정답 +${P.quiz}${P.bet ? ` · <b>판돈 ${P.bet}점</b>(진 조가 이긴 조에게)` : ''} · 같은 사람들끼리 ${P.streak}판 넘게 연속이면 승리 점수 없음</div>`;
-  const canEarn = pon && P.earn > 0 && ST.bal < P.refill;
+  if (pon) $('#homePts').innerHTML = `💰 내 포인트 <b>${ST.bal}</b>점<div class="note" style="margin-top:4px">대전(2:2·1:1) 대기실에서 걸 점수를 골라요(한 판 최대 ${P.max}점). 고른 점수 중 가장 작은 점수로, 진 쪽이 이긴 쪽에게 줘요. 같은 사람들끼리 ${P.streak}판 넘게 연속이면 포인트 없는 연습 경기 · 포인트가 ${P.refill}점 이하면 충전 문제(+${P.earn}점)</div>`;
+  const canEarn = pon && P.earn > 0 && ST.bal <= P.refill;
   $('#btnEarn').classList.toggle('hidden', !canEarn);
   $('#btnEarn').disabled = !ok || !!ST.earnWait || !!ST.earn;
-  if (canEarn) $('#btnEarn').textContent = `🪙 좌표 문제 풀고 포인트 받기 (+${P.earn}점, ${P.refill}점보다 적을 때)`;
+  if (canEarn) $('#btnEarn').textContent = `🪙 좌표 문제 풀고 포인트 받기 (+${P.earn}점, ${P.refill}점 이하일 때)`;
   $('#ruleN').textContent = ST.settings.n;
   $('#ruleP').textContent = ST.settings.penalty ? '차례를 잃어요' : '다시 찍어요';
   $('#ruleAlt').innerHTML = ST.settings.alt ? '<b>번갈아 부르기</b>: 우리 조 차례가 끝날 때마다 말하는 사람과 찍는 사람이 서로 바뀌어요.' : '한 판이 끝나면 조 안에서 말하는 사람과 찍는 사람이 바뀌어요.';
@@ -553,6 +564,7 @@ function applyRules(E) { E.level = lvOf(); E.n = ST.settings.n; E.penalty = ST.s
 function humanTeam(E, t) { return t !== E.cpuTeam && !(E.autoPlace && t === 'A'); }
 const oneSeat = v => !!(v.autoPlace || v.duo);   // 찍는 사람 없이 고른 좌표에 바로 놓는 판 (혼자 연습, 1:1)
 function swapTeam(E, t) { if (!humanTeam(E, t) || E.duo) return; const c = E.seats[t + 'c'], p = E.seats[t + 'p']; E.seats[t + 'c'] = p; E.seats[t + 'p'] = c; }
+const betV = v => Math.max(0, Math.min(999, Number(v) | 0));
 function pst(E, seat) {
   const p = E.seats[seat]; if (!p) return { calls: 0, ok: 0, bad: 0 };
   return E.stats[p.dev] || (E.stats[p.dev] = { name: p.name, team: seat[0], calls: 0, ok: 0, bad: 0 });
@@ -574,7 +586,7 @@ function eStart(E) {
   Object.assign(E, { board: {}, log: [], phase: 'call', turn: E.first, secret: null, winner: null, line: null, ev: null, moves: 0, last: null, reported: false });
   startTurn(E);
   E.round++; E.gid = (E.code || 'L') + '-' + Date.now().toString(36) + '-' + E.round + '-' + DEV.slice(1, 5);
-  E.stats = {}; SEATS.forEach(s => { if (E.seats[s] && humanTeam(E, s[0])) pst(E, s); });
+  E.stats = {}; SEATS.forEach(s => { if (E.seats[s] && humanTeam(E, s[0])) pst(E, s).bet = betV(E.seats[s].bet); });
 }
 const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 function checkWin(b, x, y, t, n) {
@@ -725,13 +737,14 @@ function hostAct(dev, a) {
       if (E.phase === 'lobby') {
         if (cur && cur.dev !== dev) break;
         mine.forEach(s => (E.seats[s] = null));
-        E.seats[a.seat] = { name: mem.name, dev, on: true };
+        E.seats[a.seat] = { name: mem.name, dev, on: true, bet: betV(a.bet) };
       } else if (cur && !cur.on && !mine.length) {
-        E.seats[a.seat] = { name: mem.name, dev, on: true };
+        E.seats[a.seat] = { name: mem.name, dev, on: true, bet: cur.bet || 0 };
       }
       break;
     }
     case 'unsit': if (E.phase === 'lobby') mine.forEach(s => (E.seats[s] = null)); break;
+    case 'bet': if (E.phase === 'lobby' || E.phase === 'over') mine.forEach(s => { E.seats[s].bet = betV(a.v); }); break;
     case 'start': if (dev === DEV && E.phase === 'lobby' && ready(E)) { applyRules(E); eStart(E); } break;
     case 'call': { const s = E.turn + 'c'; if (mine.includes(s)) eCall(E, s, a.x, a.y); break; }
     case 'roll': { const s = E.turn + 'c'; if (mine.includes(s)) eRoll(E, s); break; }
@@ -771,7 +784,7 @@ function update() {
 }
 function reportResult(E) {
   if (DEMO || E.mode === 'demo') return;
-  const players = Object.values(E.stats).map(p => ({ name: p.name, team: p.team, role: p.calls && (p.ok + p.bad) ? 'cp' : (p.calls ? 'c' : 'p'), calls: p.calls, ok: p.ok, bad: p.bad }));
+  const players = Object.values(E.stats).map(p => ({ name: p.name, team: p.team, role: p.calls && (p.ok + p.bad) ? 'cp' : (p.calls ? 'c' : 'p'), calls: p.calls, ok: p.ok, bad: p.bad, bet: p.bet || 0 }));
   sendT({ t: 'result', gid: E.gid, mode: E.mode, n: E.n, winner: E.winner, moves: E.moves, players, cpuTeam: E.cpuTeam, dir: E.line ? lineDir(E.line) : null, level: E.level });
 }
 
@@ -782,7 +795,7 @@ function createRoom(mode) {
   const code = String(1000 + Math.floor(Math.random() * 9000));
   if ((mode === 'online' && ST.settings.quad === false) || (mode === 'duo' && ST.settings.duo === false)) return toast('선생님이 잠가 둔 방식이에요', true);
   const E = mkEngine({ code, mode, n: ST.settings.n, penalty: ST.settings.penalty, cpuTeam: mode === 'cpu2' ? 'B' : null, duo: mode === 'duo' });
-  E.seats.Ac = { name: myName, dev: DEV, on: true };
+  E.seats.Ac = { name: myName, dev: DEV, on: true, bet: ST.myBet };
   room = { kind: 'host', mode, code, cap: mode === 'online' ? 4 : 2, net: null, members: new Map(), E, ready: false };
   room.members.set(DEV, { name: myName, dev: DEV, conn: null, on: true });
   const r = room;
@@ -919,23 +932,45 @@ function render() {
   if (v.phase === 'lobby') { hideResult(); show('lobby'); renderLobby(v, mine); }
   else { show('game'); renderGame(v, mine); }
 }
+/* 💰 서로 베팅: 대전(2:2·1:1)에서 각자 걸 점수를 고르면, 고른 점수 중 가장 작은 점수로 겨룸. 진 쪽이 이긴 쪽에게 (판정·지급은 선생님 화면) */
+const betOn = v => ptOn() && !DEMO && ST.bal != null && (ST.pt.max || 0) > 0 && (v.mode === 'online' || v.mode === 'duo');
+const betCap = () => Math.max(0, Math.min(ST.pt ? ST.pt.max || 0 : 0, ST.bal == null ? 0 : ST.bal));
+const myBetCap = () => Math.max(0, Math.min(ST.myBet, betCap()));
+function setMyBet(n) { ST.myBet = Math.max(0, Math.min(betCap(), Math.round(n) || 0)); localStorage.cgBet = ST.myBet; act({ t: 'bet', v: ST.myBet }); if (room && room.kind === 'client' && room.view) render(); }
+function renderBet(v, mine) {
+  const box = $('#lbBet');
+  if (!betOn(v)) { box.innerHTML = ''; return; }
+  const cap = betCap(), my = myBetCap();
+  const mySeat = mine.map(s => v.seats[s]).find(Boolean);
+  if (mySeat && betV(mySeat.bet) !== my && !(UI.betSent && UI.betSent.v === my && Date.now() - UI.betSent.t < 2000)) {   // 앉을 때 포인트를 몰랐거나 포인트가 줄었으면 맞춤
+    UI.betSent = { v: my, t: Date.now() }; setTimeout(() => act({ t: 'bet', v: my }), 0);
+  }
+  const need = SEATS.filter(s => !(v.cpuTeam && s[0] === v.cpuTeam) && !(v.duo && s[1] === 'p'));
+  const sat = need.map(s => v.seats[s]).filter(Boolean);
+  const stake = sat.length === need.length ? Math.min(...sat.map(p => betV(p.bet))) : null;
+  box.innerHTML = `<div class="card betbox"><div class="bt">💰 이번 판에 걸 점수 <span class="sub" style="font-weight:400">(내 포인트 ${ST.bal} · 한 판 최대 ${ST.pt.max})</span></div>
+    <div class="br"><button data-bet="-5">−</button><span class="bn">${my}</span><button data-bet="+5">＋</button></div>
+    <div class="qk"><button data-bet="0">0</button><button data-bet="10">10</button><button data-bet="half">절반</button><button data-bet="max">최대 ${cap}</button></div>
+    <div class="bst">${v.duo ? '두 사람' : '네 사람'}이 고른 점수 중 <b>가장 작은 점수</b>로 겨뤄요. 진 ${v.duo ? '사람이 이긴 사람' : '조가 이긴 조'}에게 줘요.<br>${stake == null ? '모두 앉으면 걸리는 점수가 보여요.' : stake ? `→ 지금 걸리는 점수: <b style="font-size:22px;color:#8a6d00">${stake}점</b>` : '→ 누군가 0점을 골라서 <b>포인트 없는 연습 경기</b>예요.'}</div></div>`;
+}
 function renderLobby(v, mine) {
   const isHost = room.kind === 'host';
   $('#lbCode').textContent = v.code;
   $('#lbHint').textContent = v.mode === 'cpu2' ? '짝에게 알려 주세요 (2명)' : v.duo ? '상대에게 알려 주세요 (1:1, 2명)' : '친구들에게 알려 주세요 (4명)';
-  if (v.duo) $('#lbInfo').textContent = `🤺 1:1 대전 · ${LEVELS[v.level] || ''} · ${v.n}목 · 점을 누르고 그 점의 좌표를 맞혀야 놓여요${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
-  else $('#lbInfo').textContent = `이번 판: ${LEVELS[v.level] || ''} · ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'}${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}${ptOn() && ST.pt.bet && v.mode === 'online' ? ` · 💰 판돈 ${ST.pt.bet}점` : ''} · 자리를 눌러 앉으세요`;
+  if (v.duo) $('#lbInfo').textContent = `🤺 1:1 대전 · ${LEVELS[v.level] || ''} · ${v.n}목 · 점을 누르고 그 점의 좌표를 맞혀야 놓여요${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}· 자리를 눌러 앉으세요`;
+  else $('#lbInfo').textContent = `이번 판: ${LEVELS[v.level] || ''} · ${v.n}목 · 틀리게 찍으면 ${v.penalty ? '차례를 잃어요' : '다시 찍어요'} · ${v.alt ? '번갈아 부르기 (차례마다 역할 교대)' : '판마다 역할 교대'}${v.luck === 'dice' ? ' · 🎲 사분면 주사위' : ''}· 자리를 눌러 앉으세요`;
   let h = '';
   ['A', 'B'].forEach(t => {
     h += `<div class="card team"><h3>${stoneHTML(t)} ${v.duo ? (t === 'A' ? '흑돌' : '백돌') : TEAM[t]}</h3>`;
     if (v.cpuTeam === t) h += `<div class="seat cpu"><div class="role">상대</div><div class="who">🤖 컴퓨터</div></div>`;
     else (v.duo ? ['c'] : ['c', 'p']).forEach(r => {
       const s = t + r, p = v.seats[s], me = mine.includes(s);
-      h += `<button class="seat ${p ? 'taken' : ''} ${me ? 'me' : ''} ${p && !p.on ? 'off' : ''}" data-seat="${s}"><div class="role">${v.duo ? '🤺 선수' : (v.alt ? '처음 ' : '') + (r === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람')}</div><div class="who">${p ? esc(p.name) + (me ? ' (나)' : '') + (!p.on ? ' · 끊김' : '') : '비어 있음 — 눌러서 앉기'}</div></button>`;
+      h += `<button class="seat ${p ? 'taken' : ''} ${me ? 'me' : ''} ${p && !p.on ? 'off' : ''}" data-seat="${s}"><div class="role">${v.duo ? '🤺 선수' : (v.alt ? '처음 ' : '') + (r === 'c' ? '🗣 말하는 사람' : '✋ 찍는 사람')}</div><div class="who">${p ? esc(p.name) + (me ? ' (나)' : '') + (!p.on ? ' · 끊김' : '') : '비어 있음 — 눌러서 앉기'}</div>${p && betOn(v) ? `<div class="bet">💰 ${betV(p.bet)}점 걸기</div>` : ''}</button>`;
     });
     h += '</div>';
   });
   $('#lbTeams').innerHTML = h;
+  renderBet(v, mine);
   const wait = (v.members || []).filter(m => !m.seated && m.on).map(m => esc(m.name));
   $('#lbWait').textContent = wait.length ? '자리를 고르는 중: ' + wait.join(', ') : '';
   const bs = $('#btnStart'); bs.classList.toggle('hidden', !isHost);
@@ -1166,7 +1201,7 @@ function showResult(v, mine) {
     const dir = lineDir(L), my = UI.ruleAns && UI.ruleAns.round === v.round ? UI.ruleAns.a : null;
     h += `<div class="box" style="margin-top:8px"><div style="font-weight:900">한 줄로 놓인 점들의 좌표</div><div class="winpts m">${L.map(p => P(p.x, p.y)).join(', ')}</div>`;
     if (ST.settings.rule !== false || DEMO) {
-      h += `<div style="font-size:16px;font-weight:700;margin:4px 0">이 점들의 좌표에서 찾을 수 있는 규칙을 고르세요.${ptOn() && !DEMO && ST.pt.rule && mine.length && v.mode !== 'solo' ? ` <span class="note">(맞히면 +${ST.pt.rule}점)</span>` : ''}</div><div class="opts" id="ruleOpts">` +
+      h += `<div style="font-size:16px;font-weight:700;margin:4px 0">이 점들의 좌표에서 찾을 수 있는 규칙을 고르세요.</div><div class="opts" id="ruleOpts">` +
         RULES.map((r, i) => `<button data-r="${i}" class="${my == null ? '' : i === dir ? 'right' : i === my ? 'wrongpick' : ''}" ${my != null ? 'disabled' : ''} style="min-height:48px;font-size:18px">${r}</button>`).join('') + '</div>';
       if (my != null) h += `<p style="margin:8px 0 0;font-size:16px"><b>${my === dir ? '⭕ 맞았어요!' : '❌ 다시 보세요.'}</b> ${hint}</p>`;
     } else h += `<div style="font-size:16px">이 점들의 좌표에서 어떤 규칙이 보이나요?</div><details class="hint"><summary>확인하기</summary>${hint}</details>`;
@@ -1182,7 +1217,7 @@ function showResult(v, mine) {
     rows.forEach(st => { h += `<tr><td>${stoneHTML(st.team)}</td><td>${esc(st.name)}</td><td>${st.calls}번</td><td>${st.ok}</td><td>${st.bad}</td></tr>`; });
     h += '</table>';
   }
-  if (ptOn() && !DEMO && v.mode !== 'demo' && v.mode !== 'solo' && mine.length) h += `<div id="resPts">${UI.lastPts && Date.now() - UI.lastPts.at < 8000 ? ptsLine() : '<div class="ptline">💰 포인트 계산 중…</div>'}</div>`;
+  if (ptOn() && !DEMO && (v.mode === 'online' || v.mode === 'duo') && mine.length) h += `<div id="resPts">${UI.lastPts && Date.now() - UI.lastPts.at < 8000 ? ptsLine() : '<div class="ptline">💰 포인트 계산 중…</div>'}</div>`;
   const isHost = room && room.kind === 'host';
   h += '<div class="row" style="margin-top:12px">';
   if (mine.length) h += `<button class="btn pri" id="btnAgain">${oneSeat(v) || v.alt ? '한 판 더' : '역할 바꿔서 한 판 더'}</button>`;
@@ -1288,7 +1323,8 @@ function bind() {
   $('#btnDemo').onclick = () => startLocal('demo');
   $$('#demoL button').forEach(b => b.onclick = () => { ST.settings.luck = b.dataset.l; $$('#demoL button').forEach(x => x.classList.toggle('pri', x === b)); refreshHome(); });
   $$('#demoN button').forEach(b => b.onclick = () => { ST.settings.n = Number(b.dataset.n); $$('#demoN button').forEach(x => x.classList.toggle('pri', x === b)); refreshHome(); });
-  $('#lbTeams').addEventListener('click', e => { const s = e.target.closest('[data-seat]'); if (s) act({ t: 'sit', seat: s.dataset.seat }); });
+  $('#lbTeams').addEventListener('click', e => { const s = e.target.closest('[data-seat]'); if (s) act({ t: 'sit', seat: s.dataset.seat, bet: myBetCap() }); });
+  $('#lbBet').addEventListener('click', e => { const b = e.target.closest('[data-bet]'); if (!b) return; const v = b.dataset.bet, c = betCap(); let n = v === 'half' ? Math.floor(c / 2) : v === 'max' ? c : v[0] === '+' || v[0] === '-' ? myBetCap() + Number(v) : Number(v); setMyBet(n); });
   $('#btnStart').onclick = () => act({ t: 'start' });
   $('#btnLeave1').onclick = () => leaveRoom();
   $('#btnLeave2').onclick = confirmLeave;
