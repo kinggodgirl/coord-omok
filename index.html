@@ -135,6 +135,11 @@ label.f{display:grid;gap:6px;font-weight:700}
 #quizOv{z-index:60}
 #quizOv .q{font-weight:900;font-size:22px;margin:0 0 10px}
 #quizOv .fig{max-width:440px;margin:0 auto 10px}
+#askOv{z-index:61}
+#askOv .q{font-weight:900;font-size:17px;margin:0 0 4px;color:var(--accent)}
+#askOv .aq{font-weight:900;font-size:23px;margin:0 0 12px;line-height:1.45}
+#askOv textarea{width:100%;font:inherit;font-size:19px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;margin-top:10px;resize:none}
+#askOv .opts button.right{border-color:var(--ok);background:#e3f3e8;font-weight:700}
 .opts{display:grid;gap:8px}
 .opts button{min-height:56px;border-radius:12px;border:2px solid var(--line);background:#fff;font-size:21px;text-align:left;padding:8px 16px}
 .opts button.pick{border-color:var(--ink);background:#f1efe8}
@@ -285,6 +290,8 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
 <div id="resOv" class="ov hidden"><div class="card" id="resCard"></div></div>
 <!-- 퀴즈 -->
 <div id="quizOv" class="ov hidden"><div class="card" id="quizCard"></div></div>
+<!-- 선생님 질문(의견 받기) -->
+<div id="askOv" class="ov hidden"><div class="card" id="askCard"></div></div>
 <!-- 충전 문제 -->
 <div id="earnOv" class="ov hidden"><div class="card" id="earnCard"></div></div>
 <!-- 멈춤 -->
@@ -296,7 +303,7 @@ u.gl{text-decoration:underline;text-decoration-color:var(--accent2);text-decorat
 
 <script>
 'use strict';
-const APP_VER = 10, R = 5;
+const APP_VER = 11, R = 5;
 const qs = new URLSearchParams(location.search);
 const DEMO = qs.get('demo') === '1';
 const $ = s => document.querySelector(s);
@@ -420,6 +427,8 @@ function onTeacher(m) {
       if (m.ver !== APP_VER) $('#verBar').classList.remove('hidden');
       applySettings(m.settings); setPause(m.pause); setPt(m.pt);
       if (m.quiz) openQuiz(m.quiz); else closeQuiz();
+      if (m.ask) openAsk(m.ask); else closeAsk();
+      sendRoom(true);
       break;
     case 'ver': if (m.ver !== APP_VER) $('#verBar').classList.remove('hidden'); break;
     case 'settings': applySettings(m.settings); break;
@@ -427,6 +436,9 @@ function onTeacher(m) {
     case 'quiz': openQuiz(m.quiz); break;
     case 'quizReveal': revealQuiz(m); break;
     case 'quizClose': closeQuiz(); break;
+    case 'ask': openAsk(m.ask); break;
+    case 'askReveal': revealAsk(m); break;
+    case 'askClose': closeAsk(); break;
     case 'home': if (room) leaveRoom(true); goHome(); toast('선생님이 처음 화면으로 모았어요'); break;
     case 'pt': setPt(m.pt); break;
     case 'points': gotPoints(m); break;
@@ -750,7 +762,12 @@ function update() {
     const r = room;
     r.cpuT = setTimeout(() => { if (room === r && r.E === E) { eCpu(E); update(); } }, (E.phase === 'roll' ? 900 : 1500) + (E.ev && E.ev.kind === 'wrong' ? 1800 : 0) + (E.ev && E.ev.kind === 'roll' ? 1700 : 0));
   }
-  if (E.phase === 'over' && !E.reported) { E.reported = true; reportResult(E); }
+  if (E.phase === 'over' && !E.reported) {
+    E.reported = true; E.wins = E.wins || { A: 0, B: 0, D: 0 };
+    if (E.winner === 'A' || E.winner === 'B') E.wins[E.winner]++; else E.wins.D++;
+    reportResult(E);
+  }
+  sendRoom();
 }
 function reportResult(E) {
   if (DEMO || E.mode === 'demo') return;
@@ -833,8 +850,21 @@ function startLocal(mode) {
   room = { kind: 'local', mode, code: '', E, members: null };
   eStart(E); update();
 }
+/* 선생님 화면 '게임 방 현황'용: 방장(또는 혼자 연습) 기기가 방 요약을 보냄. 바뀐 게 있을 때만 */
+let roomSig = '';
+function sendRoom(force) {
+  if (!room || room.kind === 'client' || DEMO || room.mode === 'demo' || !ST.classOk) return;
+  const E = room.E, seats = {}, stones = { A: 0, B: 0 };
+  SEATS.forEach(s => { const x = E.seats[s]; seats[s] = x ? { name: x.name, on: x.on !== false } : null; });
+  Object.values(E.board).forEach(t => { if (t in stones) stones[t]++; });
+  const m = { t: 'room', code: room.code || '', mode: E.mode, phase: E.phase, n: E.n, level: E.level, luck: E.luck, seats, cpuTeam: E.cpuTeam, members: (E.members || []).map(x => ({ name: x.name, on: x.on })), stones, moves: E.moves, turn: E.turn, winner: E.winner, wins: E.wins || null, round: E.round };
+  const sig = JSON.stringify(m);
+  if (!force && sig === roomSig) return;
+  roomSig = sig; sendT(m);
+}
 function leaveRoom(silent) {
   if (!room) return;
+  if (room.kind !== 'client') { sendT({ t: 'room', closed: true }); roomSig = ''; }
   const r = room; room = null; r.leaving = true; clearTimeout(r.cpuT);
   if (r.kind === 'client' && r.conn) { r.conn.send({ t: 'leave' }); setTimeout(() => r.conn.close(), 250); }
   if (r.kind === 'host') {
@@ -1205,6 +1235,39 @@ function drawQuiz() {
 }
 function revealQuiz(m) { if (!ST.quiz || m.qid !== ST.quiz.qid) return; const first = !ST.quiz.reveal; ST.quiz.reveal = { answer: m.answer, explain: m.explain }; drawQuiz(); if (first && ST.quiz.my === m.answer) confetti(); }
 function closeQuiz() { ST.quiz = null; $('#quizOv').classList.add('hidden'); }
+
+/* ---------- ❓ 선생님 질문 (의견 받기): 고르고 까닭을 써서 보냄. 정답 공개 전까지는 바꿔서 다시 보낼 수 있음 ---------- */
+function openAsk(a) {
+  if (!a || DEMO) return;
+  if (!ST.ask || ST.ask.id !== a.id) ST.ask = { id: a.id, q: a.q, options: a.options || [], my: null, r: '', sent: null, reveal: null };
+  if (a.reveal) ST.ask.reveal = a.reveal;
+  drawAsk(); $('#askOv').classList.remove('hidden');
+}
+function drawAsk() {
+  const z = ST.ask; if (!z) return;
+  const done = !!z.reveal;
+  let h = `<p class="q">❓ 선생님의 질문</p><p class="aq">${CoordKit.glossify(esc(z.q).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>'))}</p>`;
+  h += '<div class="opts">' + z.options.map((o, i) => {
+    let cls = i === z.my ? 'pick' : '';
+    if (done) cls = i === z.reveal.answer ? 'right' : (i === z.sent ? 'wrongpick' : '');
+    return `<button data-i="${i}" class="${cls}" ${done ? 'disabled' : ''}>${esc(o)}</button>`;
+  }).join('') + '</div>';
+  if (!done) {
+    h += `<textarea id="askWhy" rows="2" maxlength="80" placeholder="왜 그렇게 생각했나요? (짧게 · 안 써도 돼요)">${esc(z.r)}</textarea>`;
+    h += `<div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="btn pri" id="askSend" ${z.my == null ? 'disabled' : ''}>${z.sent != null ? '고쳐서 다시 보내기' : '보내기'}</button><span class="sub">${z.sent != null ? '✅ 보냈어요. 선생님 화면에 모여요.' : '하나를 고르고 [보내기]'}</span></div>`;
+  } else {
+    h += `<div class="box" style="margin-top:10px;font-size:17px"><b>${z.sent === z.reveal.answer ? '⭕ 맞았어요!' : '정답은 초록색이에요'}</b><br>${CoordKit.glossify(esc(z.reveal.explain || ''))}</div>`;
+  }
+  $('#askCard').innerHTML = h;
+  $$('#askCard .opts button').forEach(b => b.onclick = () => { if (ST.ask.reveal) return; ST.ask.my = Number(b.dataset.i); drawAsk(); });
+  const w = $('#askWhy'); if (w) w.oninput = () => { ST.ask.r = w.value; };
+  const sb = $('#askSend'); if (sb) sb.onclick = () => {
+    if (ST.ask.my == null) return;
+    ST.ask.sent = ST.ask.my; sendT({ t: 'askAns', id: ST.ask.id, a: ST.ask.my, r: (ST.ask.r || '').slice(0, 80) }); drawAsk();
+  };
+}
+function revealAsk(m) { if (!ST.ask || m.id !== ST.ask.id) return; const first = !ST.ask.reveal; ST.ask.reveal = { answer: m.answer, explain: m.explain }; drawAsk(); $('#askOv').classList.remove('hidden'); if (first && ST.ask.sent === m.answer) confetti(); }
+function closeAsk() { ST.ask = null; $('#askOv').classList.add('hidden'); }
 
 /* ---------- 이벤트 연결 ---------- */
 function bind() {

@@ -8,48 +8,93 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=STIX+Two+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="firebase-config.js"></script>
 <script src="fbnet.js"></script>
 <script src="problems.js"></script>
+<script src="slides.js"></script>
 <style>
-:root{--ink:#16181c;--paper:#f7f5f0;--line:#dcd8cf;--muted:#6d6a64;--accent:#d2452f;--accent2:#1f4e8c;--ok:#1d7a46}
+:root{--ink:#16181c;--paper:#f7f5f0;--line:#dcd8cf;--muted:#6d6a64;--accent:#d2452f;--accent2:#1f4e8c;--ok:#1d7a46;--orange:#e07a1f}
 *{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',system-ui,sans-serif;font-size:16px}
 button{font:inherit;color:inherit;cursor:pointer}
 .m{font-family:'Times New Roman','STIX Two Text',Times,serif}
 .hidden{display:none!important}
-.btn{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 16px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-weight:700;text-decoration:none;color:inherit}
 .btn.pri{background:var(--ink);color:#fff}
 .btn.acc{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.org{background:var(--orange);border-color:var(--orange);color:#fff}
 .btn.sm{min-height:34px;padding:0 10px;font-size:14px;border-width:1.5px}
 .btn:disabled{opacity:.35;cursor:not-allowed}
-header{display:flex;align-items:center;gap:18px;padding:12px 20px;background:#fff;border-bottom:1.5px solid var(--line);flex-wrap:wrap}
-header h1{margin:0;font-size:20px;font-weight:900}
-.codebox{display:flex;align-items:baseline;gap:10px}
-.codebox .c{font-size:40px;font-weight:900;letter-spacing:.08em}
-#peerState{font-size:14px;color:var(--muted)}
+.wrap{max-width:1240px;margin:0 auto;padding:16px 20px 60px}
+.head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.head h1{margin:0;font-size:26px;font-weight:900}
+.head h1 span{color:var(--accent)}
 .sp{flex:1}
-nav{display:flex;gap:4px;padding:10px 20px 0}
-nav button{border:0;background:none;padding:10px 16px;font-weight:700;border-bottom:3px solid transparent;font-size:16px}
-nav button.on{border-color:var(--ink)}
-main{padding:16px 20px;max-width:1280px}
-.card{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
-.card h3{margin:0 0 10px;font-size:18px}
+#peerState{font-size:14px;color:var(--muted);background:#fff;border:1.5px solid var(--line);border-radius:99px;padding:4px 12px}
+#jump{position:sticky;top:0;z-index:20;background:rgba(247,245,240,.94);backdrop-filter:blur(4px);display:flex;gap:4px;flex-wrap:wrap;padding:8px 0;margin:8px 0 4px;border-bottom:1.5px solid var(--line)}
+#jump a{color:inherit;text-decoration:none;font-weight:700;font-size:15px;padding:6px 12px;border-radius:99px}
+#jump a:hover{background:#ece9e1}
+#jump a.alarm{color:var(--accent)}
+.card{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:14px}
+.card h2{margin:0 0 10px;font-size:20px;font-weight:900;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h3{margin:0 0 8px;font-size:17px}
+.top{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;margin-top:12px}
+.top .card{margin-bottom:0}
+.grid{display:grid;grid-template-columns:1fr 1.35fr;gap:14px;align-items:start}
+.code{font-size:84px;font-weight:900;letter-spacing:.12em;line-height:1}
+.link{font-size:15px;word-break:break-all;background:#faf9f5;padding:8px 10px;border-radius:8px;margin:10px 0;border:1px solid var(--line)}
+.pausebtn{width:100%;font-size:24px;font-weight:900;padding:20px;margin-top:8px;border-radius:14px;border:2px solid var(--accent);background:var(--accent);color:#fff}
+.pausebtn.paused{background:var(--ink);border-color:var(--ink);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.75}}
 table{border-collapse:collapse;width:100%;font-size:15px}
 th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left}
-th{background:#faf9f5;font-weight:700}
-td.num,th.num{text-align:right}
-.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:13px;font-weight:700;background:#eee}
-.badge.on{background:#e3f3e8;color:var(--ok)} .badge.off{background:#f1f1f1;color:#999} .badge.warn{background:#fbe9e5;color:var(--accent)}
+th{background:#faf9f5;font-weight:700;font-size:14px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{max-height:440px;overflow:auto}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:13px;font-weight:700;background:#eee}
+.badge.on{background:#e3f3e8;color:var(--ok)} .badge.off{background:#f1f1f1;color:#999} .badge.warn{background:#fbe9e5;color:var(--accent)} .badge.blue{background:#e6eef8;color:var(--accent2)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.seg button{border:1.5px solid var(--ink);background:#fff;padding:8px 18px;font-weight:700}
+.seg{display:inline-flex}
+.seg button{border:1.5px solid var(--ink);background:#fff;padding:7px 14px;font-weight:700}
 .seg button:first-child{border-radius:10px 0 0 10px}.seg button:last-child{border-radius:0 10px 10px 0}
 .seg button+button{border-left:0}
 .seg button.on{background:var(--ink);color:#fff}
-label.tg{display:flex;gap:8px;align-items:center;font-weight:700}
+label.tg{display:flex;gap:8px;align-items:center;font-weight:700;cursor:pointer}
 label.tg input{width:20px;height:20px}
 textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;width:100%}
 .sub{color:var(--muted);font-size:14px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#bbb;flex:none}
+.dot.on{background:#2fbf63;box-shadow:0 0 6px #2fbf63}
+.stu{list-style:none;margin:0;padding:0;max-height:460px;overflow:auto}
+.stu li{display:grid;grid-template-columns:auto minmax(80px,auto) 1fr auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px dashed var(--line)}
+.stu li.off{opacity:.45}
+.stu .nm{font-weight:900}
+.stu .st{font-size:14px;color:var(--muted)}
+.stu .pt{font-weight:900;font-variant-numeric:tabular-nums}
+.allow{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:10px}
+/* 게임 방 현황 */
+.rsum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
+.room{border:2px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+.room.play{border-color:var(--accent2)}
+.room.over{border-color:var(--ok)}
+.room.lost{opacity:.55;border-style:dashed}
+.room .rh{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.room .rh b{font-size:20px}
+.room .rs{font-weight:700;font-size:15px}
+.room .tm{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;background:#faf9f5}
+.room .tm.turn{background:#e6eef8;outline:2px solid var(--accent2)}
+.room .tm.win{background:#e3f3e8;outline:2px solid var(--ok)}
+.room .tm .nm{font-size:14px;line-height:1.5}
+.room .tm .nm small{color:var(--muted)}
+.room .sc{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;text-align:right;line-height:1.1}
+.room .sc small{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+.stone{display:inline-block;width:20px;height:20px;border-radius:50%;border:2px solid #111}
+.stone.b{background:#111}.stone.w{background:#fff}
+.idle{margin-top:10px;font-size:15px}
+/* 퀴즈 */
 .qprev{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}
 .qprev .fig{width:320px}
 .qtext{font-weight:900;font-size:20px;margin-bottom:10px}
@@ -61,175 +106,275 @@ textarea,input.txt{font:inherit;padding:8px 12px;border:1.5px solid var(--line);
 .bar .opt{font-size:18px}
 .bar.right .opt{font-weight:900;color:var(--ok)}
 .names{font-size:13px;color:var(--muted);grid-column:1/-1;margin-top:-4px}
-#big{position:fixed;inset:0;background:#fff;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;cursor:pointer;padding:30px;text-align:center}
-#big .t{font-size:44px;font-weight:900}
-#big .c{font-size:160px;font-weight:900;letter-spacing:.1em;line-height:1}
-#big .u{font-size:28px;color:var(--muted);word-break:break-all}
-#bigQuiz{position:fixed;inset:0;background:#fff;z-index:80;padding:30px 40px;overflow:auto}
+.ptin{width:70px;font:inherit;padding:4px 8px;border:1.5px solid var(--line);border-radius:8px;text-align:right}
+.ptgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:8px 24px;margin-top:10px}
+.ptgrid label span{white-space:nowrap}
+.ptgrid label{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ptcols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.help{border:2px solid var(--accent);border-radius:14px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center}
+.help .nm{font-size:20px;font-weight:900}
+.help .ms{font-size:15px;color:var(--muted);grid-column:1/2}
+.help .tp{grid-column:1/-1;font-size:15px;background:#fbe9e5;border-radius:10px;padding:6px 10px}
+.log{font-size:14px;max-height:220px;overflow:auto;display:grid;gap:2px}
+.plus{color:var(--ok);font-weight:700}.minus{color:var(--accent);font-weight:700}
+.setgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
+#verWarn{background:var(--accent);color:#fff;padding:8px 20px;font-weight:700}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:12px;z-index:200}
+/* 크게 보기 */
+#big{position:fixed;inset:0;background:#fff;z-index:120;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;cursor:pointer;padding:30px;text-align:center}
+#big .t{font-size:min(5vw,52px);font-weight:900}
+#big .bw{display:flex;gap:min(6vw,80px);align-items:center;justify-content:center;flex-wrap:wrap}
+#big .qr{padding:16px;background:#fff;border:2px solid var(--line);border-radius:16px;line-height:0}
+#big .qr img,#big .qr canvas{width:min(34vw,52vh)!important;height:min(34vw,52vh)!important}
+#big .cl{font-size:min(3vw,30px);font-weight:700}
+#big .c{font-size:min(20vw,220px);font-weight:900;letter-spacing:.1em;line-height:1}
+#big .u{font-size:min(2.4vw,24px);color:var(--muted);word-break:break-all;max-width:90vw}
+#big .n{font-size:min(3vw,28px);font-weight:700}
+#bigQuiz,#bigPts{position:fixed;inset:0;background:#fff;z-index:120;padding:30px 40px;overflow:auto;cursor:pointer}
 #bigQuiz .qtext{font-size:34px}
 #bigQuiz .fig{width:440px}
 #bigQuiz .bar .opt{font-size:28px}
 #bigQuiz .bar .track{height:40px}
 #bigQuiz .bar{grid-template-columns:minmax(260px,auto) 1fr 80px;font-size:24px}
-#bigPts{position:fixed;inset:0;background:#fff;z-index:80;padding:30px 50px;overflow:auto;cursor:pointer}
 #bigPts h2{font-size:40px;margin:0 0 16px}
 #bigPts ol{font-size:34px;line-height:1.6;columns:2;column-gap:60px;margin:0;padding-left:1.4em}
 #bigPts ol b{display:inline-block;min-width:6em}
-.ptin{width:70px;font:inherit;padding:4px 8px;border:1.5px solid var(--line);border-radius:8px;text-align:right}
-.ptgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px 24px;margin-top:10px}
-.ptgrid label span{white-space:nowrap}
-.ptgrid label{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.help{border:2px solid var(--accent);border-radius:14px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center}
-.help .nm{font-size:20px;font-weight:900}
-.help .ms{font-size:15px;color:var(--muted);grid-column:1/2}
-.help .tp{grid-column:1/-1;font-size:15px;background:#fbe9e5;border-radius:10px;padding:6px 10px}
-.log{font-size:14px;max-height:260px;overflow:auto;display:grid;gap:2px}
-.plus{color:var(--ok);font-weight:700}.minus{color:var(--accent);font-weight:700}
-nav button.alarm{color:var(--accent)}
-#verWarn{background:var(--accent);color:#fff;padding:8px 20px;font-weight:700}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:12px;z-index:90}
+@media (max-width:900px){.top,.grid,.ptcols,.setgrid{grid-template-columns:1fr}}
+
+/* 📽 수업 슬라이드 (검은 제목 띠 + 주황 제목) */
+#sl{display:none;position:fixed;inset:0;z-index:150;background:#222}
+#sl.on{display:block}
+#slFrame{position:absolute;width:1600px;height:900px;transform-origin:0 0;background:#fff;overflow:hidden;font-size:34px;color:#1d2433}
+#slNav{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;background:#111;color:#ddd;font-size:14px}
+#slNav button{background:#333;color:#eee;padding:5px 12px;font-size:14px;border-radius:8px;border:0}
+#slNav button.acc{background:#d9690f}
+#slNav button.on2{background:#2e8b57}
+#slNav .sp{flex:1}#slNav .code2{font-size:15px}#slNav .code2 b{color:#ffb35c;font-size:20px;letter-spacing:3px}
+.shd{height:120px;background:#000;display:flex;align-items:center;padding:0 60px}
+.shd>.ed{flex:1;color:#f07c1e;font-size:60px;font-weight:700;letter-spacing:2px;text-align:center}
+.stag{color:#fff;font-size:28px;line-height:1.3;text-align:right;min-width:160px}
+.ed[contenteditable=true]{outline:3px dashed #f07c1e;outline-offset:4px;min-width:40px;min-height:1em}
+#slFrame .ed b{color:#f07c1e;font-weight:700}
+#slFrame .m{font-size:1.08em}
+#slFrame [data-s],#slFrame [data-h]{transition:opacity .35s}
+#slFrame .hid{opacity:0;pointer-events:none}
+.scover{display:grid;grid-template-columns:1fr 1fr;height:100%}
+.scover .pic{background:#1d2433;display:flex;align-items:center;justify-content:center;padding:70px}
+.scover .pic svg{width:100%;height:auto;border-radius:16px}
+.scover .ctext{display:flex;flex-direction:column;justify-content:center;padding:0 70px;color:#f07c1e}
+.scover .ctext>div:nth-child(1){font-size:34px;color:#7a5af0}
+.scover .ctext>div:nth-child(2){font-size:72px;margin-top:20px;font-weight:700}
+.scover .ctext>div:nth-child(3){font-size:48px;margin-top:6px}
+.sgoal{padding:120px 110px;font-size:56px;line-height:1.6}
+.sgoal .gl{font-size:40px;color:#6b6f78;margin-bottom:20px}
+.sjoin{display:grid;grid-template-columns:1.15fr 1fr;gap:40px;padding:50px 70px;font-size:42px;line-height:1.7}
+.sjoin .jr{text-align:center}.sjoin .qr{display:inline-block;padding:14px;background:#fff;border:2px solid #ddd;min-height:330px;line-height:0}
+.sjoin .jc{font-size:44px;margin-top:14px}.sjoin .jc b{font-size:90px;letter-spacing:10px}.sjoin .ju{font-size:22px;color:#6b6f78;word-break:break-all}
+.sfig{display:grid;grid-template-columns:1fr 680px;gap:30px;padding:30px 50px 20px 70px;height:780px;align-items:center}
+.sfig .tx{font-size:38px;line-height:1.55;word-break:keep-all}
+.sfig .tx p{margin:0 0 26px}
+.sfig .fg svg{width:680px;height:680px;display:block}
+.stext{padding:46px 80px;font-size:42px;line-height:1.75;word-break:keep-all}
+.stext p{margin:0 0 16px}.stext .note{font-size:34px;color:#6b6f78;margin-top:34px}
+.blank{display:inline-block;min-width:160px;border-bottom:4px solid #1d2433;color:transparent;cursor:pointer;text-align:center;padding:0 10px}
+.blank.show{color:#cf3f54;font-weight:700}
+.sask{display:grid;grid-template-columns:560px 1fr;gap:30px;padding:24px 50px 20px 60px;height:780px}
+.sask .aq{font-size:38px;line-height:1.4;font-weight:700;word-break:keep-all}
+.sask .ah{font-size:26px;color:#6b6f78;margin-top:8px}
+.sask .afig svg{width:520px;height:520px;display:block;margin:10px auto 0}
+.sask .sctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:22px;margin-bottom:14px}
+.sask .sctl .st{flex:1;color:#6b6f78;min-width:200px}
+.sask .sctl button{font-size:22px;padding:10px 20px;border-radius:12px;border:2px solid #1d2433;background:#fff;font-weight:700}
+.sask .sctl button.acc{background:#f07c1e;border-color:#f07c1e;color:#fff}
+.sask .sctl button.okb{background:#1d7a46;border-color:#1d7a46;color:#fff}
+.sask .sctl label{font-size:20px;display:flex;gap:6px;align-items:center}
+.abars{display:grid;gap:12px}
+.abar{display:grid;grid-template-columns:400px 1fr 70px;gap:12px;align-items:center;font-size:26px;word-break:keep-all}
+.abar .tr{height:40px;background:#f0eee8;border-radius:10px;overflow:hidden}
+.abar .fl{height:100%;background:#1f4e8c;transition:width .3s}
+.abar.right{color:#1d7a46;font-weight:700}.abar.right .fl{background:#1d7a46}
+.abar .c{text-align:right;font-weight:700}
+.aexp{margin-top:14px;font-size:28px;background:#e3f3e8;border-radius:14px;padding:12px 18px;line-height:1.45}
+.ans{margin-top:16px;max-height:330px;overflow:auto;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start}
+.ans .a{background:#fff6e8;border:3px solid #f0b46a;border-radius:16px;padding:8px 14px;max-width:440px;font-size:22px;line-height:1.35}
+.ans .a .o{font-size:16px;color:#b5651d;font-weight:700}
+.ans .a .n{font-size:15px;color:#6b6f78;margin-top:2px}
 </style>
 </head>
 <body>
 <div id="verWarn" class="hidden">버전이 다른 학생이 있어요. 표시된 학생은 패드를 새로고침하게 해 주세요.</div>
-<header>
-  <h1>좌표평면 오목 · 교사용</h1>
-  <div class="codebox"><span>수업 코드</span><span class="c" id="code">----</span></div>
-  <span id="peerState">준비 중…</span>
-  <span class="sp"></span>
-  <button class="btn" id="btnCopy">📋 학생용 주소 복사</button>
-  <button class="btn" id="btnBig">📺 크게 보기</button>
-  <button class="btn" id="btnThick" title="학생 화면 좌표평면도 함께 굵어져요">📐 굵은 선</button>
-  <a class="btn" href="index.html?demo=1" target="_blank" style="text-decoration:none;color:inherit">🎬 시연 화면</a>
-</header>
-<nav id="tabs">
-  <button data-tab="students" class="on">학생 <span id="cnt">0</span></button>
-  <button data-tab="help">🙋 도울 학생 <span id="helpCnt">0</span></button>
-  <button data-tab="points">💰 포인트</button>
-  <button data-tab="control">설정 · 멈춤</button>
-  <button data-tab="quiz">좌표 퀴즈</button>
-  <button data-tab="records">기록</button>
-  <button data-tab="backup">백업 · 초기화</button>
-</nav>
-<main>
-  <section data-pane="students">
+<div class="wrap">
+  <div class="head">
+    <h1>좌표평면 오목 <span>교사용</span></h1>
+    <span id="peerState">준비 중…</span>
+    <span class="sp"></span>
+    <button class="btn org" id="btnSlides">📽 수업 슬라이드</button>
+    <button class="btn" id="btnThick" title="학생 화면 좌표평면도 함께 굵어져요">📐 굵은 선</button>
+    <a class="btn acc" href="#secBackup">🔄 백업 · 초기화</a>
+  </div>
+
+  <div class="top" id="secTop">
     <div class="card">
-      <h3>접속한 학생</h3>
-      <table><thead><tr><th>이름</th><th>연결</th><th>지금 하는 일</th><th class="num">오늘 경기</th><th class="num">오늘 찍기 정확도</th><th class="num">포인트</th><th>버전</th></tr></thead><tbody id="stuBody"></tbody></table>
+      <h2>수업 코드</h2>
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div class="code" id="code">----</div>
+        <div class="row">
+          <a class="btn" href="index.html?demo=1" target="_blank" rel="noopener" title="새 탭에서 열려요. 프로젝터에 띄우고 선생님이 컴퓨터와 대결하며 사용법을 보여 주세요.">🎬 시연 (선생님 vs 컴퓨터)</a>
+          <button class="btn pri" id="btnBig">📺 크게 보기 (QR)</button>
+          <button class="btn" id="btnNewCode2">새 코드 만들기</button>
+        </div>
+      </div>
+      <div class="link" id="linkShow"></div>
+      <div class="row"><button class="btn pri" id="btnCopy">📋 학생용 주소 복사</button><span class="sub">이 주소로 들어오면 수업 코드가 자동으로 들어가요</span></div>
+      <p class="sub" style="margin:10px 0 0">※ 이 페이지를 닫거나 새로고침해도 학생끼리 하던 경기는 계속돼요. 다시 열면 학생 연결이 자동으로 이어져요. 수업 코드는 이 브라우저에 저장돼 바뀌지 않아요.</p>
+    </div>
+    <div class="card">
+      <h2>전체 화면 멈춤</h2>
+      <label class="sub" for="pauseMsg">학생 화면에 보일 문구</label>
+      <input class="txt" id="pauseMsg" maxlength="40" value="선생님을 봐 주세요 👀">
+      <button class="pausebtn" id="btnPause">✋ 모든 학생 화면 멈추기</button>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="sub" id="pauseInfo">연결된 학생 0명</span><button class="btn sm" id="btnHome">🏠 모두 처음 화면으로</button></div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)">
+        <b>학생이 쓸 수 있는 것</b> <span class="sub">(끄면 그 방식은 새로 못 만들어요 · 하던 판은 계속)</span>
+        <div class="allow">
+          <label class="tg"><input type="checkbox" id="optQuad"> 👥 2:2 방 (4명)</label>
+          <label class="tg"><input type="checkbox" id="optDuo"> 🤺 1:1 방 (2명)</label>
+          <label class="tg"><input type="checkbox" id="optCpu"> 🤖 2명 vs 컴퓨터</label>
+          <label class="tg"><input type="checkbox" id="optSolo"> 혼자 연습</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav id="jump">
+    <a href="#secRooms">🎮 게임 방 <span id="jRooms">0</span></a>
+    <a href="#secStu">👥 학생·점수 <span id="cnt">0</span></a>
+    <a href="#secHelp" id="jHelp">🙋 도울 학생 <span id="helpCnt">0</span></a>
+    <a href="#secQuiz">📝 좌표 퀴즈</a>
+    <a href="#secPts">💰 포인트</a>
+    <a href="#secSet">⚙ 게임 설정</a>
+    <a href="#secGames">📒 경기 기록</a>
+    <a href="#secBackup">💾 백업 · 초기화</a>
+  </nav>
+
+  <div class="card" id="secRooms">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">🎮 게임 방 현황</h2><span class="sub">방장 패드가 알려 주는 대로 바로바로 바뀌어요</span></div>
+    <div class="rsum" id="roomSum" style="margin-top:10px"></div>
+    <div class="rooms" id="roomList"></div>
+    <div class="idle" id="idleList"></div>
+  </div>
+
+  <div class="grid" id="secStu">
+    <div class="card">
+      <h2>접속한 학생 <span class="badge" id="stuCount">0명</span></h2>
+      <ul class="stu" id="stuList"></ul>
       <div class="row" style="margin-top:10px"><button class="btn sm" id="btnClearOff">끊긴 학생 지우기</button><span class="sub" id="failInfo"></span></div>
     </div>
-  </section>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h2 style="margin:0">학생별 점수 · 전적</h2>
+        <div class="row"><div class="seg" id="segRange"><button data-r="today" class="on">오늘</button><button data-r="all">전체</button></div><button class="btn sm" id="btnCsvS">CSV 내려받기</button><button class="btn sm" id="btnBigPts">📺 순위 크게 보기</button></div>
+      </div>
+      <div class="scroll"><table><thead><tr><th class="num">순위</th><th>이름</th><th class="num">포인트</th><th class="num">대전</th><th class="num">승</th><th class="num">패</th><th class="num">무</th><th class="num">컴퓨터전</th><th class="num">찍기 정확도</th></tr></thead><tbody id="recBody"></tbody></table></div>
+      <p class="sub" style="margin:6px 0 0">순위는 포인트 순(포인트를 끄면 승 순). 찍기 정확도 = 맞게 찍은 횟수 ÷ 찍은 횟수 (1:1은 좌표 읽기 포함)</p>
+    </div>
+  </div>
 
-  <section data-pane="help" class="hidden">
-    <div class="card">
-      <h3>✋ 손든 학생</h3>
-      <div id="handList" style="margin-bottom:14px"></div>
-      <h3>🙋 지금 도울 학생 <span class="sub">(오늘 찍기·읽기를 3번 이상 틀린 학생 · 도와준 뒤 [✓ 도왔어요])</span></h3>
-      <div id="helpList"></div>
-    </div>
-    <div class="card">
-      <h3>오늘 반 전체 찍기 실수 유형</h3>
-      <p class="sub">여러 학생이 같은 실수를 하면 잠깐 멈추고 함께 짚어 주세요.</p>
-      <div class="bars" id="missBars"></div>
-    </div>
-  </section>
-
-  <section data-pane="points" class="hidden">
-    <div class="card">
-      <div class="row" style="justify-content:space-between"><h3 style="margin:0">💰 포인트 <label class="tg" style="display:inline-flex;font-size:15px;margin-left:10px"><input type="checkbox" id="ptOn"> 포인트 쓰기</label></h3>
-        <div class="row"><button class="btn sm" id="btnBigPts">📺 순위 크게 보기</button><button class="btn sm" id="btnCsvP">CSV 내려받기</button><button class="btn sm" id="btnPtReset">모두 처음 점수로</button></div></div>
-      <div class="ptgrid" id="ptGrid"></div>
-      <p class="sub" style="margin-top:10px">판돈: 진 조가 이긴 조에게 줘요. 걸리는 점수는 [판돈]과 네 명 중 가장 적게 가진 사람의 점수 중 작은 쪽이에요. 같은 사람들끼리 연속으로 [연속 제한]판을 넘게 하면 승리 점수와 판돈이 없어요(맞게 찍기 점수는 그대로). 혼자 연습은 포인트가 없어요. 장부는 이 컴퓨터 브라우저에 저장되고 백업 파일에도 들어가요.</p>
-    </div>
-    <div class="card">
-      <h3>학생별 포인트</h3>
-      <table><thead><tr><th class="num">순위</th><th>이름</th><th class="num">포인트</th><th class="num">오늘 변화</th><th>조정</th></tr></thead><tbody id="ptBody"></tbody></table>
-    </div>
-    <div class="card"><h3>최근 포인트 기록</h3><div class="log" id="ptLog"></div></div>
-  </section>
-
-  <section data-pane="control" class="hidden">
-    <div class="card">
-      <h3>게임 설정 <span class="sub">(새로 시작하는 판부터 적용)</span></h3>
-      <div class="row" style="gap:24px">
-        <div class="row"><b>방 만들기</b><label class="tg"><input type="checkbox" id="optQuad"> 👥 2:2 (4명)</label><label class="tg"><input type="checkbox" id="optDuo"> 🤺 1:1 (2명)</label><span class="sub">끄면 그 방식은 잠겨서 새 방을 못 만들어요 (이미 하는 판은 계속)</span></div>
-        <div class="row"><b>몇 목</b><div class="seg" id="segN"><button data-n="4">4목</button><button data-n="5">5목</button></div></div>
-        <div class="row"><b>단계</b><div class="seg" id="segLv"><button data-v="low">하 · 제1사분면</button><button data-v="mid">중 · 네 사분면</button><button data-v="high">상 · 눈금 숫자 없이</button></div></div>
-        <div class="row"><b>운 요소</b><div class="seg" id="segLuck"><button data-l="none">없음</button><button data-l="dice">🎲 사분면 주사위</button></div></div>
-        <label class="tg"><input type="checkbox" id="optAlt"> 번갈아 부르기 (차례마다 조 안에서 역할 교대, 끄면 판마다)</label>
-        <label class="tg"><input type="checkbox" id="optShow"> 찍는 사람 화면에 짝이 고른 좌표 보이기</label>
-        <label class="tg"><input type="checkbox" id="optRule"> 판이 끝나면 한 줄로 놓인 점들의 규칙 고르기</label>
-        <label class="tg"><input type="checkbox" id="optPenalty"> 틀리게 찍으면 차례 잃기 (끄면 다시 찍기)</label>
-        <label class="tg"><input type="checkbox" id="optCpu"> 2명 vs 컴퓨터 허용</label>
-        <label class="tg"><input type="checkbox" id="optSolo"> 혼자 연습 허용</label>
-        <label class="tg"><input type="checkbox" id="optThick"> 📐 굵은 선 (프로젝터·TV용, 학생 화면도 함께 바뀜)</label>
+  <div class="card" id="secHelp">
+    <h2>🙋 도울 학생</h2>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div>
+        <h3>✋ 손든 학생</h3>
+        <div id="handList" style="margin-bottom:14px"></div>
+        <h3>지금 도울 학생 <span class="sub">(오늘 찍기·읽기를 3번 이상 틀린 학생 · 도와준 뒤 [✓ 도왔어요])</span></h3>
+        <div id="helpList"></div>
+      </div>
+      <div>
+        <h3>오늘 반 전체 찍기 실수 유형</h3>
+        <p class="sub" style="margin-top:0">여러 학생이 같은 실수를 하면 잠깐 멈추고 함께 짚어 주세요.</p>
+        <div class="bars" id="missBars"></div>
       </div>
     </div>
-    <div class="card">
-      <h3>전체 멈춤</h3>
-      <div class="row"><input class="txt" id="pauseMsg" style="max-width:480px" value="선생님을 봐 주세요 👀"><button class="btn acc" id="btnPause">✋ 전체 멈춤</button></div>
-      <p class="sub" id="pauseState"></p>
-    </div>
-    <div class="card">
-      <h3>처음 화면으로 모으기</h3>
-      <p class="sub">모든 학생이 방에서 나와 처음 화면으로 돌아가요. (진행 중인 판은 사라져요)</p>
-      <button class="btn" id="btnHome">🏠 모두 처음 화면으로</button>
-    </div>
-  </section>
+  </div>
 
-  <section data-pane="quiz" class="hidden">
-    <div class="card">
-      <h3>좌표 퀴즈 내기</h3>
-      <div class="row">
-        <select id="qType" style="font:inherit;padding:8px;border-radius:10px"><option value="">무작위</option></select>
-        <button class="btn" id="btnNewQ">🎲 새 문제 만들기</button>
-        <button class="btn pri" id="btnSendQ" disabled>학생에게 내기</button>
-        <button class="btn" id="btnReveal" disabled>정답 공개</button>
-        <button class="btn" id="btnCloseQ" disabled>닫기</button>
-        <button class="btn" id="btnBigQ">📺 화면 띄우기</button>
+  <div class="card" id="secQuiz">
+    <h2>📝 좌표 퀴즈</h2>
+    <div class="row">
+      <select id="qType" style="font:inherit;padding:8px;border-radius:10px"><option value="">무작위</option></select>
+      <button class="btn" id="btnNewQ">🎲 새 문제 만들기</button>
+      <button class="btn pri" id="btnSendQ" disabled>학생에게 내기</button>
+      <button class="btn" id="btnReveal" disabled>정답 공개</button>
+      <button class="btn" id="btnCloseQ" disabled>닫기</button>
+      <button class="btn" id="btnBigQ">📺 화면 띄우기</button>
+    </div>
+    <div id="qArea" style="margin-top:14px"><p class="sub">문제를 만들어 미리 보고, [학생에게 내기]를 누르세요.</p></div>
+  </div>
+
+  <div class="card" id="secPts">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">💰 포인트 <label class="tg" style="display:inline-flex;font-size:15px;margin-left:10px"><input type="checkbox" id="ptOn"> 포인트 쓰기</label></h2>
+      <div class="row"><button class="btn sm" id="btnCsvP">CSV 내려받기</button><button class="btn sm" id="btnPtReset">모두 처음 점수로</button></div></div>
+    <div class="ptcols">
+      <div>
+        <div class="ptgrid" id="ptGrid"></div>
+        <p class="sub" style="margin-top:10px;line-height:1.6">판돈: 진 조가 이긴 조에게 줘요. 걸리는 점수는 [판돈]과 네 명 중 가장 적게 가진 사람의 점수 중 작은 쪽(제로섬). 같은 사람들끼리 연속으로 [연속 제한]판을 넘게 하면 승리 점수와 판돈이 없어요(맞게 찍기 점수는 그대로). 혼자 연습은 포인트가 없어요. 장부는 이 컴퓨터 브라우저에 저장되고 백업 파일에도 들어가요.</p>
+        <h3 style="margin-top:12px">최근 포인트 기록</h3><div class="log" id="ptLog"></div>
       </div>
+      <div class="scroll" style="max-height:520px"><table><thead><tr><th class="num">순위</th><th>이름</th><th class="num">포인트</th><th class="num">오늘 변화</th><th>조정</th></tr></thead><tbody id="ptBody"></tbody></table></div>
     </div>
-    <div class="card" id="qArea"><p class="sub">문제를 만들어 미리 보고, [학생에게 내기]를 누르세요.</p></div>
-  </section>
+  </div>
 
-  <section data-pane="records" class="hidden">
-    <div class="card">
-      <div class="row" style="justify-content:space-between"><h3 style="margin:0">학생별 기록</h3>
-        <div class="row"><div class="seg" id="segRange"><button data-r="today" class="on">오늘</button><button data-r="all">전체</button></div><button class="btn sm" id="btnCsvS">CSV 내려받기</button></div></div>
-      <table style="margin-top:10px"><thead><tr><th>이름</th><th class="num">대전</th><th class="num">승</th><th class="num">패</th><th class="num">무</th><th class="num">컴퓨터전(승/판)</th><th class="num">말하기</th><th class="num">찍기 성공</th><th class="num">찍기 실수</th><th class="num">찍기 정확도</th></tr></thead><tbody id="recBody"></tbody></table>
+  <div class="card" id="secSet">
+    <h2>⚙ 게임 설정 <span class="sub" style="font-weight:400">(새로 시작하는 판부터 적용)</span></h2>
+    <div class="setgrid">
+      <div class="row"><b style="min-width:60px">몇 목</b><div class="seg" id="segN"><button data-n="4">4목</button><button data-n="5">5목</button></div></div>
+      <div class="row"><b style="min-width:60px">운 요소</b><div class="seg" id="segLuck"><button data-l="none">없음</button><button data-l="dice">🎲 사분면 주사위</button></div></div>
+      <div class="row" style="grid-column:1/-1"><b style="min-width:60px">단계</b><div class="seg" id="segLv"><button data-v="low">하 · 제1사분면</button><button data-v="mid">중 · 네 사분면</button><button data-v="high">상 · 눈금 숫자 없이</button></div></div>
+      <label class="tg"><input type="checkbox" id="optAlt"> 번갈아 부르기 (차례마다 조 안에서 역할 교대, 끄면 판마다)</label>
+      <label class="tg"><input type="checkbox" id="optShow"> 찍는 사람 화면에 짝이 고른 좌표 보이기</label>
+      <label class="tg"><input type="checkbox" id="optRule"> 판이 끝나면 한 줄로 놓인 점들의 규칙 고르기</label>
+      <label class="tg"><input type="checkbox" id="optPenalty"> 틀리게 찍으면 차례 잃기 (끄면 다시 찍기)</label>
+      <label class="tg"><input type="checkbox" id="optThick"> 📐 굵은 선 (프로젝터·TV용, 학생 화면도 함께 바뀜)</label>
     </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between"><h3 style="margin:0">경기 기록</h3><button class="btn sm" id="btnCsvG">CSV 내려받기</button></div>
-      <table style="margin-top:10px"><thead><tr><th>시각</th><th>방식</th><th>목</th><th>흑돌 조</th><th>백돌 조</th><th>결과</th><th class="num">놓은 돌</th><th>포인트</th></tr></thead><tbody id="gameBody"></tbody></table>
-    </div>
-  </section>
+  </div>
 
-  <section data-pane="backup" class="hidden">
-    <div class="card">
-      <h3>백업</h3>
-      <p class="sub">기록은 이 컴퓨터의 브라우저에 자동 저장돼요. 다른 컴퓨터로 옮기거나 보관하려면 파일로 저장하세요.</p>
-      <div class="row"><button class="btn" id="btnSave">💾 백업 저장</button><label class="btn">📂 불러오기<input type="file" id="fileLoad" accept=".json" hidden></label></div>
-    </div>
-    <div class="card">
-      <h3>초기화</h3>
-      <div class="row" style="gap:20px"><label class="tg"><input type="checkbox" id="rsGames" checked> 경기 기록</label><label class="tg"><input type="checkbox" id="rsOff"> 끊긴 학생 목록</label><label class="tg"><input type="checkbox" id="rsQuiz"> 퀴즈</label><label class="tg"><input type="checkbox" id="rsPts"> 포인트(모두 처음 점수로)</label><label class="tg"><input type="checkbox" id="rsMiss"> 찍기 실수 기록</label><label class="tg"><input type="checkbox" id="rsCode"> 수업 코드 새로 만들기</label></div>
-      <button class="btn acc" id="btnReset" style="margin-top:10px">🔄 선택한 항목 초기화</button>
-    </div>
-  </section>
-</main>
-<div id="big" class="hidden"><div class="t">좌표평면 오목</div><div>수업 코드</div><div class="c" id="bigCode"></div><div class="u" id="bigUrl"></div><div class="sub">화면을 누르면 닫혀요</div></div>
+  <div class="card" id="secGames">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">📒 경기 기록 <span class="badge" id="gameCount">0경기</span></h2><button class="btn sm" id="btnCsvG">CSV 내려받기</button></div>
+    <div class="scroll" style="margin-top:10px"><table><thead><tr><th>시각</th><th>방식</th><th>목</th><th>흑돌 조</th><th>백돌 조</th><th>결과</th><th class="num">놓은 돌</th><th>포인트</th></tr></thead><tbody id="gameBody"></tbody></table></div>
+    <p class="sub" style="margin:6px 0 0">위쪽 [오늘/전체]에 따라 보여요. 혼자 연습도 기록돼요(포인트 없음).</p>
+  </div>
+
+  <div class="card" id="secBackup">
+    <h2>💾 백업 · 초기화</h2>
+    <p class="sub" style="margin-top:0">기록은 이 컴퓨터의 브라우저에 자동 저장돼요. 다른 컴퓨터로 옮기거나 보관하려면 파일로 저장하세요.</p>
+    <div class="row"><button class="btn" id="btnSave">💾 백업 저장</button><label class="btn">📂 불러오기<input type="file" id="fileLoad" accept=".json" hidden></label></div>
+    <div class="row" style="gap:18px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)"><label class="tg"><input type="checkbox" id="rsGames" checked> 경기 기록</label><label class="tg"><input type="checkbox" id="rsOff"> 끊긴 학생 목록</label><label class="tg"><input type="checkbox" id="rsQuiz"> 퀴즈·의견</label><label class="tg"><input type="checkbox" id="rsPts"> 포인트(모두 처음 점수로)</label><label class="tg"><input type="checkbox" id="rsMiss"> 찍기 실수 기록</label><label class="tg"><input type="checkbox" id="rsCode"> 수업 코드 새로 만들기</label></div>
+    <button class="btn acc" id="btnReset" style="margin-top:10px">🔄 선택한 항목 초기화</button>
+  </div>
+</div>
+
+<div id="big" class="hidden"><div class="t">좌표평면 오목</div>
+  <div class="bw"><div class="qr" id="bigQR"></div><div><div class="cl">수업 코드</div><div class="c" id="bigCode"></div></div></div>
+  <div class="u" id="bigUrl"></div><div class="n" id="bigCount"></div><div class="sub">화면을 누르면 닫혀요</div></div>
 <div id="bigQuiz" class="hidden"></div>
 <div id="bigPts" class="hidden"></div>
+<div id="sl"><div id="slFrame"></div>
+  <div id="slNav"><button id="slPrev">◀</button><span id="slPage"></span><button id="slNext">▶</button>
+    <span class="sp"></span><span style="font-size:13px;opacity:.7">← → 키로 넘기기 · 접속 <b id="slCnt">0</b>명</span>
+    <button id="slPauseOn">✋ 멈추기</button><button id="slPauseOff">▶ 활성화</button>
+    <button id="slEditBtn">✏ 글 고치기</button><button id="slResetBtn">↺ 이 장 처음대로</button>
+    <button id="slFull">⛶ 전체 화면</button>
+    <span class="code2">코드 <b id="slCode"></b></span><button id="slClose">✕ 닫기</button></div></div>
 <div id="toast" class="hidden"></div>
 
 <script>
 'use strict';
-const APP_VER = 10;
+const APP_VER = 11;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mathify = s => esc(s).replace(/\(([^)]*)\)/g, '<span class="m">($1)</span>');
 const TEAM = { A: '흑돌 조', B: '백돌 조' };
 const MODE = { online: '2:2 대전', duo: '1:1 대전', cpu2: '2명 vs 컴퓨터', solo: '혼자 연습' };
+const LVN = { low: '하', mid: '중', high: '상' };
 const VS = m => m === 'online' || m === 'duo';   // 학생끼리 대전
 const LS = 'tgCoordOmok';
 let toastT;
@@ -238,23 +383,25 @@ function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.remove
 /* ---------- 저장 ---------- */
 const S = Object.assign({
   code: String(1000 + Math.floor(Math.random() * 9000)),
-  settings: { n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none' },
-  pause: { on: false, msg: '선생님을 봐 주세요 👀' },
+  settings: {}, pause: { on: false, msg: '선생님을 봐 주세요 👀' },
   games: [], quiz: null, offline: [],
-  pt: null, bal: {}, ptLog: [], run: {}, miss: [], helped: {}
+  pt: null, bal: {}, ptLog: [], run: {}, miss: [], helped: {},
+  slide: 0, slEdit: {}, ask: null, hideNames: true
 }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
 S.settings = Object.assign({ n: 4, penalty: true, cpu: true, solo: true, alt: true, showCall: true, luck: 'none', thick: false, quad: true, duo: true, level: 'mid', rule: true }, S.settings);
 const PT_DEF = { on: true, start: 100, place: 1, win: 5, draw: 2, cpuWin: 3, quiz: 3, rule: 2, bet: 0, streak: 3, refill: 10, earn: 2 };
 S.pt = Object.assign({}, PT_DEF, S.pt);
-['bal', 'run', 'helped'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
-['ptLog', 'miss'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
-function save() { try { localStorage.setItem(LS, JSON.stringify({ code: S.code, settings: S.settings, pause: S.pause, games: S.games, quiz: S.quiz, offline: S.offline, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped })); } catch (e) { } }
+['bal', 'run', 'helped', 'slEdit'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
+['ptLog', 'miss', 'games', 'offline'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
+function save() { try { localStorage.setItem(LS, JSON.stringify({ code: S.code, settings: S.settings, pause: S.pause, games: S.games, quiz: S.quiz, offline: S.offline, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped, slide: S.slide, slEdit: S.slEdit, ask: S.ask, hideNames: S.hideNames })); } catch (e) { } }
 
 /* ---------- 연결 : Firebase (fbnet.js) ----------
    omok/{수업 코드}/hub 를 이 화면이 차지 → 학생은 up 으로 보내고, 이 화면은 dm(한 명)·down(모두)으로 보냄
-   학생 방(rooms/…)은 학생 기기끼리 Firebase를 거쳐 진행 — 이 화면을 닫아도 경기는 계속됨
+   학생 방(rooms/…)은 학생 기기끼리 Firebase를 거쳐 진행 — 이 화면을 닫아도 경기는 계속됨.
+   방 현황은 방장 패드가 'room' 메시지로 알려 줌.
 ------------------------------------------------------------ */
 const students = new Map(); // dev -> {name, dev, conn, status, ver, last, on}
+const rooms = new Map();    // 방장 dev -> 방 요약
 let hub = null, failCount = 0, hubOk = false, srvOn = false, openCode = null;
 /* 수업 코드 주인 표시: 이 컴퓨터의 이 브라우저에 고정 (새로고침·창 닫았다 열기에도 같은 코드 유지) */
 const TAB = localStorage.tgOwner || (localStorage.tgOwner = 't' + Math.random().toString(36).slice(2, 10));
@@ -265,7 +412,7 @@ if (tabBus) {
   tabBus.onmessage = e => {
     if (!e.data || e.data.t !== 'open' || stopped) return;
     stopped = true; if (hub) { hub.close(); hub = null; } hubOk = false; clearTimeout(claimT);
-    document.body.insertAdjacentHTML('afterbegin', '<div style="position:fixed;inset:0;background:rgba(22,24,28,.88);color:#fff;z-index:99;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;text-align:center;padding:30px">다른 창에서 교사용 페이지가 열려서<br>이 창은 멈췄어요. 이 창은 닫아도 돼요.</div>');
+    document.body.insertAdjacentHTML('afterbegin', '<div style="position:fixed;inset:0;background:rgba(22,24,28,.88);color:#fff;z-index:999;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;text-align:center;padding:30px">다른 창에서 교사용 페이지가 열려서<br>이 창은 멈췄어요. 이 창은 닫아도 돼요.</div>');
   };
   tabBus.postMessage({ t: 'open' });
 }
@@ -274,15 +421,17 @@ function peerState() {
   if (!FBNet.ok) { $('#peerState').textContent = '🔴 연결 설정(firebase-config.js)이 없어요'; return; }
   if (hubOk) $('#peerState').textContent = srvOn ? '🟢 수업이 열렸어요' : '🟡 인터넷 다시 연결 중… (학생 기록은 다시 연결되면 들어와요)';
 }
+function showCode() {
+  $('#code').textContent = S.code; $('#slCode').textContent = S.code; $('#linkShow').textContent = studentURL();
+}
 function startPeer() {
-  $('#code').textContent = S.code;
+  showCode();
   if (!FBNet.ok || stopped) { peerState(); return; }
   clearTimeout(claimT); claimTry = 0;
   if (hub) { hub.close(); hub = null; }
   if (openCode && openCode !== S.code) FBNet.release('omok/' + openCode + '/hub');
   hubOk = false; $('#peerState').textContent = '수업 여는 중…';
-  const code = S.code;
-  tryClaim(code);
+  tryClaim(S.code);
 }
 function tryClaim(code) {
   FBNet.claim('omok/' + code + '/hub', TAB).then(ok => {
@@ -294,7 +443,7 @@ function tryClaim(code) {
     if (!ok) {
       $('#peerState').innerHTML = '🔴 이 코드를 다른 컴퓨터(브라우저)가 쓰고 있어요. <button class="btn sm" id="btnRetry">다시 시도</button> <button class="btn sm" id="btnNewCode">새 코드</button>';
       $('#btnRetry').onclick = () => startPeer();
-      $('#btnNewCode').onclick = () => { S.code = newCode(); save(); students.clear(); renderStudents(); startPeer(); };
+      $('#btnNewCode').onclick = () => changeCode(true);
       return;
     }
     openCode = code; hubOk = true;
@@ -302,9 +451,15 @@ function tryClaim(code) {
     peerState();
   });
 }
+function changeCode(force) {
+  if (!force && onlineCount() && !confirm('수업 코드를 바꾸면 지금 접속한 학생 연결이 끊겨요. 계속할까요?')) return false;
+  S.code = newCode(); save(); students.clear(); rooms.clear(); renderAll(); startPeer();
+  if (SL.on) renderSlide();
+  return true;
+}
 FBNet.onConnected(on => { srvOn = on; if (on && hubOk && openCode === S.code) FBNet.claim('omok/' + S.code + '/hub', TAB); peerState(); });
 const stuConn = dev => ({ send: m => { if (hub) hub.sendTo(dev, m); } });
-const syncMsg = () => ({ t: 'sync', ver: APP_VER, settings: S.settings, pause: S.pause, quiz: publicQuiz(), pt: publicPt() });
+const syncMsg = () => ({ t: 'sync', ver: APP_VER, settings: S.settings, pause: S.pause, quiz: publicQuiz(), pt: publicPt(), ask: (S.ask && S.ask.open) ? publicAsk() : null });
 function onPresence(dev, on, info) {
   let st = students.get(dev);
   if (!st) {
@@ -317,7 +472,8 @@ function onPresence(dev, on, info) {
     if (info) { if (info.name) st.name = String(info.name).slice(0, 10); if (info.status) st.status = info.status; if (info.ver) st.ver = info.ver; }
     if (on && !was) { st.last = Date.now(); st.conn.send(syncMsg()); sendBal(st); }
   }
-  renderStudents();
+  const r = rooms.get(dev); if (r) r.lost = !on;
+  renderStudents(); renderRooms();
 }
 function onStudentMsg(dev, m) {
   if (!m || !m.t) return;
@@ -326,17 +482,23 @@ function onStudentMsg(dev, m) {
     students.set(dev, { name: String(m.name || '학생').slice(0, 10), dev, conn: stuConn(dev), status: m.status || (old && old.status) || '', ver: m.ver, last: Date.now(), on: true });
     S.offline = S.offline.filter(x => x !== dev);
     students.get(dev).conn.send(syncMsg()); sendBal(students.get(dev));
-    renderStudents(); renderPoints();
+    renderStudents(); renderPoints(); renderRooms();
     return;
   }
   const st = students.get(dev); if (!st) return;
   st.last = Date.now();
   switch (m.t) {
-    case 'status': st.status = m.status; renderStudents(); break;
+    case 'status': st.status = m.status; renderStudents(); renderRooms(); break;
     case 'result': addGame(m); break;
+    case 'room': gotRoom(dev, st, m); break;
     case 'quizAns':
       if (S.quiz && S.quiz.sent && !S.quiz.revealed && m.qid === S.quiz.qid && Number.isInteger(m.a) && m.a >= 0 && m.a < S.quiz.options.length) {
         S.quiz.answers[st.name] = m.a; save(); renderQuiz();
+      }
+      break;
+    case 'askAns':
+      if (S.ask && S.ask.open && !S.ask.revealed && m.id === S.ask.id && Number.isInteger(m.a) && m.a >= 0 && m.a < S.ask.options.length) {
+        S.ask.answers[st.name] = { a: m.a, r: String(m.r || '').replace(/\s+/g, ' ').trim().slice(0, 80) }; save(); renderAsk();
       }
       break;
     case 'miss': addMiss(st, m); break;
@@ -348,6 +510,69 @@ function onStudentMsg(dev, m) {
 }
 function broadcast(m) { if (hub) hub.broadcast(m); }
 function onlineCount() { let c = 0; for (const s of students.values()) if (s.on) c++; return c; }
+
+/* ---------- 🎮 게임 방 현황 (방장 패드가 보내는 요약) ---------- */
+const SEATS = ['Ac', 'Ap', 'Bc', 'Bp'];
+const nm10 = v => String(v == null ? '' : v).slice(0, 10);
+function gotRoom(dev, st, m) {
+  if (m.closed) { rooms.delete(dev); renderRooms(); return; }
+  const seats = {};
+  SEATS.forEach(s => { const x = m.seats && m.seats[s]; seats[s] = x && x.name ? { name: nm10(x.name), on: x.on !== false } : null; });
+  const n0 = v => Math.max(0, v | 0);
+  rooms.set(dev, {
+    dev, host: st.name, code: /^\d{4}$/.test(m.code) ? m.code : '', mode: MODE[m.mode] ? m.mode : 'online',
+    phase: ['lobby', 'roll', 'call', 'place', 'over'].includes(m.phase) ? m.phase : 'lobby',
+    n: m.n === 5 ? 5 : 4, level: LVN[m.level] ? m.level : 'mid', luck: m.luck === 'dice' ? 'dice' : 'none',
+    seats, cpuTeam: m.cpuTeam === 'A' || m.cpuTeam === 'B' ? m.cpuTeam : null,
+    members: Array.isArray(m.members) ? m.members.slice(0, 6).map(x => ({ name: nm10(x && x.name), on: !(x && x.on === false) })) : [],
+    stones: { A: n0(m.stones && m.stones.A), B: n0(m.stones && m.stones.B) }, moves: n0(m.moves),
+    turn: m.turn === 'B' ? 'B' : 'A', winner: ['A', 'B', 'draw'].includes(m.winner) ? m.winner : null,
+    wins: { A: n0(m.wins && m.wins.A), B: n0(m.wins && m.wins.B), D: n0(m.wins && m.wins.D) }, round: n0(m.round),
+    t: Date.now(), lost: false
+  });
+  renderRooms();
+}
+function roomNames(r) {
+  const s = new Set([r.host]);
+  SEATS.forEach(k => { if (r.seats[k]) s.add(r.seats[k].name); });
+  r.members.forEach(x => s.add(x.name));
+  return s;
+}
+function renderRooms() {
+  for (const [d, r] of rooms) if (r.lost && Date.now() - r.t > 120000) rooms.delete(d);   // 방장이 2분 넘게 끊겨 있으면 지움
+  const list = [...rooms.values()].sort((a, b) => (a.mode === 'solo') - (b.mode === 'solo') || (a.code || 'z').localeCompare(b.code || 'z'));
+  const play = list.filter(r => ['roll', 'call', 'place'].includes(r.phase)).length, lobby = list.filter(r => r.phase === 'lobby').length;
+  const inRoom = new Set(); list.forEach(r => roomNames(r).forEach(n => inRoom.add(n)));
+  const idle = [...students.values()].filter(s => s.on && !inRoom.has(s.name)).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  $('#jRooms').textContent = list.length;
+  $('#roomSum').innerHTML = `<span class="badge blue">방 ${list.length}개</span><span class="badge on">경기 중 ${play}</span><span class="badge">대기실 ${lobby}</span><span class="badge ${idle.length ? 'warn' : ''}">방에 없는 학생 ${idle.length}명</span>`;
+  $('#roomList').innerHTML = list.map(roomCard).join('') || '<p class="sub" style="margin:0">아직 만들어진 방이 없어요. 학생들이 [👥 2:2 방 만들기]나 [🤺 1:1 방 만들기]를 누르면 여기에 떠요.</p>';
+  $('#idleList').innerHTML = idle.length ? `<b>방에 없는 학생</b> <span class="sub">(처음 화면 등)</span> · ${idle.map(s => `${esc(s.name)} <span class="sub">${esc(s.status || '')}</span>`).join(' · ')}` : '';
+}
+function roomCard(r) {
+  const playing = ['roll', 'call', 'place'].includes(r.phase);
+  const need = SEATS.filter(s => !(r.cpuTeam && s[0] === r.cpuTeam) && !(r.mode === 'solo' && s === 'Ap') && !(r.mode === 'duo' && s[1] === 'p'));
+  const sat = need.filter(s => r.seats[s]).length;
+  let state = '';
+  if (r.lost) state = '⚠ 방장 연결 끊김';
+  else if (r.phase === 'lobby') state = `대기실 · 앉은 사람 ${sat}/${need.length}`;
+  else if (playing) state = `경기 중 · ${r.moves}수 · ${r.cpuTeam === r.turn ? '🤖 컴퓨터' : TEAM[r.turn]} 차례${r.phase === 'roll' ? ' (주사위)' : r.phase === 'place' ? ' (찍는 중)' : ''}`;
+  else state = '끝남 · ' + (r.winner === 'draw' ? '무승부' : (r.cpuTeam === r.winner ? '🤖 컴퓨터' : TEAM[r.winner]) + ' 승');
+  const team = t => {
+    let who;
+    if (r.cpuTeam === t) who = '🤖 컴퓨터';
+    else who = ['c', 'p'].map(k => r.seats[t + k]).filter(Boolean).map((x, i, arr) => {
+      const role = r.mode === 'duo' || r.mode === 'solo' || arr.length < 2 ? '' : ` <small>${r.seats[t + 'c'] === x ? '말하기' : '찍기'}</small>`;
+      return `<span style="${x.on ? '' : 'opacity:.45'}">${esc(x.name)}${role}${S.pt.on && r.mode !== 'solo' ? ` <small>💰${bal(x.name)}</small>` : ''}</span>`;
+    }).join(' · ') || '<small>빈자리</small>';
+    const cls = r.phase === 'over' && r.winner === t ? 'win' : (playing && r.turn === t ? 'turn' : '');
+    return `<div class="tm ${cls}"><span class="stone ${t === 'A' ? 'b' : 'w'}"></span><div class="nm"><b>${r.mode === 'duo' ? (t === 'A' ? '흑돌' : '백돌') : TEAM[t]}</b><br>${who}</div><div class="sc">${r.phase === 'lobby' ? '' : r.stones[t] + '<small>개 놓음</small>'}</div></div>`;
+  };
+  const games = r.wins.A + r.wins.B + r.wins.D;
+  return `<div class="room ${r.lost ? 'lost' : playing ? 'play' : r.phase === 'over' ? 'over' : ''}">
+    <div class="rh"><b>${r.code ? '방 ' + r.code : '혼자 연습'}</b><span class="badge blue">${MODE[r.mode]}</span><span class="badge">${LVN[r.level]} · ${r.n}목${r.luck === 'dice' ? ' · 🎲' : ''}</span>${games ? `<span class="badge">이 방 ${games}판 · 흑 ${r.wins.A} : 백 ${r.wins.B}${r.wins.D ? ` · 무 ${r.wins.D}` : ''}</span>` : ''}</div>
+    <div class="rs">${state}</div>${team('A')}${team('B')}</div>`;
+}
 
 /* ---------- 학생 목록 ---------- */
 function todayStr(t) { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
@@ -366,18 +591,18 @@ function statsFor(range) {
 }
 const acc = r => (r.ok + r.bad ? Math.round(100 * r.ok / (r.ok + r.bad)) + '%' : '—');
 function renderStudents() {
-  const today = statsFor('today');
   const list = [...students.values()].sort((a, b) => (b.on - a.on) || a.name.localeCompare(b.name, 'ko'));
   let warn = false;
-  $('#stuBody').innerHTML = list.map(s => {
-    const r = today[s.name] || { games: 0, cpuG: 0, ok: 0, bad: 0 };
+  $('#stuList').innerHTML = list.map(s => {
     const vbad = s.ver !== APP_VER; if (vbad && s.on) warn = true;
-    return `<tr><td><b>${esc(s.name)}</b></td><td><span class="badge ${s.on ? 'on' : 'off'}">${s.on ? '연결됨' : '끊김'}</span></td><td>${hands.has(s.name) ? '<span class="badge warn">✋ 손 들었어요</span> ' : ''}${esc(s.status)}</td><td class="num">${r.games + r.cpuG}</td><td class="num">${acc(r)}</td><td class="num">${S.pt.on ? bal(s.name) : '—'}</td><td>${vbad ? '<span class="badge warn">새로고침 필요</span>' : 'v' + s.ver}</td></tr>`;
-  }).join('') || '<tr><td colspan="7" class="sub">아직 들어온 학생이 없어요. 학생들에게 수업 코드를 알려 주세요.</td></tr>';
-  $('#cnt').textContent = onlineCount();
+    return `<li class="${s.on ? '' : 'off'}"><span class="dot ${s.on ? 'on' : ''}"></span><span class="nm">${esc(s.name)}</span><span class="st">${hands.has(s.name) ? '<span class="badge warn">✋ 손 들었어요</span> ' : ''}${s.on ? esc(s.status) : '끊김'}${vbad ? ' <span class="badge warn">새로고침 필요</span>' : ''}</span><span class="pt">${S.pt.on ? '💰 ' + bal(s.name) : ''}</span></li>`;
+  }).join('') || '<li class="sub" style="display:block">아직 들어온 학생이 없어요. 학생들에게 수업 코드를 알려 주세요.</li>';
+  const n = onlineCount();
+  $('#cnt').textContent = n; $('#stuCount').textContent = n + '명'; $('#pauseInfo').textContent = `연결된 학생 ${n}명`; $('#slCnt').textContent = n;
+  if (!$('#big').classList.contains('hidden')) $('#bigCount').textContent = `들어온 학생 ${n}명`;
   $('#verWarn').classList.toggle('hidden', !warn);
-  $('#failInfo').textContent = failCount ? `연결을 시도했지만 끝내 이어지지 않은 기기: ${failCount}대 (같은 와이파이인지 확인하세요)` : '';
-  renderQuizCount(); renderHelpCount();
+  $('#failInfo').textContent = failCount ? `연결을 시도했지만 끝내 이어지지 않은 기기: ${failCount}대` : '';
+  renderQuizCount(); renderHelpCount(); renderRecords();
 }
 
 /* ---------- 기록 ---------- */
@@ -387,7 +612,7 @@ function addGame(m) {
   const g = { gid: String(m.gid), time: Date.now(), mode: MODE[m.mode] ? m.mode : 'online', n: m.n === 5 ? 5 : 4, winner: ['A', 'B', 'draw'].includes(m.winner) ? m.winner : 'draw', moves: m.moves | 0, players, cpuTeam: m.cpuTeam || null, dir: [0, 1, 2, 3].includes(m.dir) ? m.dir : null, level: ['low', 'mid', 'high'].includes(m.level) ? m.level : 'mid' };
   S.games.push(g);
   awardGame(g);
-  save(); renderRecords(); renderStudents(); renderPoints();
+  save(); renderStudents(); renderPoints(); renderRooms();
 }
 let range = 'today';
 function teamNames(g, t) {
@@ -396,10 +621,16 @@ function teamNames(g, t) {
 }
 function renderRecords() {
   const map = statsFor(range);
-  const rows = Object.values(map).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  $('#recBody').innerHTML = rows.map(r => `<tr><td><b>${esc(r.name)}</b></td><td class="num">${r.games}</td><td class="num">${r.win}</td><td class="num">${r.lose}</td><td class="num">${r.draw}</td><td class="num">${r.cpuW}/${r.cpuG}</td><td class="num">${r.calls}</td><td class="num">${r.ok}</td><td class="num">${r.bad}</td><td class="num">${acc(r)}</td></tr>`).join('') || '<tr><td colspan="10" class="sub">기록이 없어요.</td></tr>';
+  ptNames().forEach(n => { if (!map[n] && S.pt.on) map[n] = { name: n, games: 0, win: 0, lose: 0, draw: 0, cpuG: 0, cpuW: 0, calls: 0, ok: 0, bad: 0 }; });
+  const rows = Object.values(map).sort((a, b) => (S.pt.on ? bal(b.name) - bal(a.name) : 0) || (b.win - a.win) || a.name.localeCompare(b.name, 'ko'));
+  let rank = 0, prev = null;
+  $('#recBody').innerHTML = rows.map((r, i) => {
+    const key = S.pt.on ? bal(r.name) : r.win; if (key !== prev) { rank = i + 1; prev = key; }
+    return `<tr><td class="num">${rank}</td><td><b>${esc(r.name)}</b></td><td class="num"><b>${S.pt.on ? bal(r.name) : '—'}</b></td><td class="num">${r.games}</td><td class="num">${r.win}</td><td class="num">${r.lose}</td><td class="num">${r.draw}</td><td class="num">${r.cpuW}/${r.cpuG}</td><td class="num">${acc(r)}</td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="sub">기록이 없어요.</td></tr>';
   const today = todayStr(Date.now());
   const gs = S.games.filter(g => range === 'all' || todayStr(g.time) === today).slice().reverse();
+  $('#gameCount').textContent = gs.length + '경기';
   $('#gameBody').innerHTML = gs.map(g => `<tr><td>${new Date(g.time).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td><td>${MODE[g.mode]}</td><td>${g.n}목</td><td>${teamNames(g, 'A')}</td><td>${teamNames(g, 'B')}</td><td>${g.winner === 'draw' ? '무승부' : TEAM[g.winner] + ' 승'}</td><td class="num">${g.moves}</td><td class="sub">${g.pts ? Object.entries(g.pts).map(([n, d]) => esc(n) + ' ' + (d > 0 ? '+' : '') + d).join(', ') + (g.stake ? ` (판돈 ${g.stake})` : '') + (g.over ? ' · 연속 제한' : '') : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="sub">기록이 없어요.</td></tr>';
 }
 function csv(rows) { return '﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n'); }
@@ -408,7 +639,7 @@ const stamp = () => new Date().toISOString().slice(0, 10);
 
 /* ---------- 포인트 (장부는 이 화면이 원본) ---------- */
 const PT_FIELDS = [
-  ['start', '처음 지급', 0, 1000], ['place', '맞게 찍기·1:1 좌표 맞히기 1번', 0, 10], ['win', '대전 승리 (2:2·1:1, 한 사람당)', 0, 50], ['draw', '대전 무승부', 0, 50],
+  ['start', '처음 지급', 0, 1000], ['place', '맞게 찍기·1:1 좌표 맞히기 1번', 0, 10], ['win', '대전 승리 (한 사람당)', 0, 50], ['draw', '대전 무승부', 0, 50],
   ['cpuWin', '컴퓨터 이기기', 0, 50], ['quiz', '좌표 퀴즈 정답', 0, 50], ['rule', '판 끝 규칙 고르기 정답', 0, 20], ['bet', '판돈 (0이면 안 걺)', 0, 100], ['streak', '같은 사람들 연속 제한(판)', 1, 20],
   ['refill', '충전 문제: 이 점수보다 적으면', 0, 1000], ['earn', '충전 문제 1개', 0, 20]
 ];
@@ -429,8 +660,7 @@ function awardGame(g) {
   if (!S.pt.on || g.mode === 'solo') return;
   const P = S.pt, names = [...new Set(g.players.map(p => p.name))];
   if (!names.length) return;
-  // 같은 사람들끼리 연속 몇 판째인지
-  const key = g.mode + ':' + names.slice().sort().join('|');
+  const key = g.mode + ':' + names.slice().sort().join('|');   // 같은 사람들끼리 연속 몇 판째인지
   let over = false;
   names.forEach(n => { const r = S.run[n]; S.run[n] = (r && r.k === key) ? { k: key, n: r.n + 1 } : { k: key, n: 1 }; if (S.run[n].n > P.streak) over = true; });
   g.over = over;
@@ -463,11 +693,10 @@ function awardQuiz(q) {
   Object.entries(q.answers).forEach(([n, a]) => { if (a === q.answer) { const d = addPts(n, S.pt.quiz, '좌표 퀴즈 정답'); notify(n, d, '좌표 퀴즈 정답'); } });
 }
 
-/* ---------- ✋ 손든 학생 ---------- */
+/* ---------- ✋ 손든 학생 · 충전 문제 ---------- */
 const hands = new Map();   // name -> 손 든 시각
 function handDone(name) { hands.delete(name); devsOf(name).forEach(st => st.conn.send({ t: 'handOff' })); renderHelp(); renderStudents(); }
-/* 충전 문제: 이 화면이 문제를 만들고 답을 가지고 있다가 채점 */
-const earnQ = {};   // name -> {id, answer, explain, t}
+const earnQ = {};   // name -> {id, answer, explain, t}  (이 화면이 문제를 만들고 답을 가지고 있다가 채점)
 function earnReq(st) {
   if (!S.pt.on || !S.pt.earn) return st.conn.send({ t: 'earnNo', msg: '지금은 충전 문제를 쓸 수 없어요.' });
   if (bal(st.name) >= S.pt.refill) return st.conn.send({ t: 'earnNo', msg: `포인트가 ${S.pt.refill}점보다 적을 때만 풀 수 있어요.` });
@@ -492,7 +721,7 @@ function renderPoints() {
   $('#ptOn').checked = S.pt.on;
   if (!$('#ptGrid').dataset.built) {
     $('#ptGrid').dataset.built = 1;
-    $('#ptGrid').innerHTML = PT_FIELDS.map(([k, l, lo, hi]) => `<label>${l}<span><input class="ptin" type="number" min="${lo}" max="${hi}" data-k="${k}"> 점</span></label>`).join('').replace(/(연속 제한\(판\)<span><input [^>]+>) 점/, '$1 판');
+    $('#ptGrid').innerHTML = PT_FIELDS.map(([k, l, lo, hi]) => `<label>${l}<span><input class="ptin" type="number" min="${lo}" max="${hi}" data-k="${k}"> ${k === 'streak' ? '판' : '점'}</span></label>`).join('');
     $$('#ptGrid input').forEach(inp => inp.onchange = () => {
       const f = PT_FIELDS.find(x => x[0] === inp.dataset.k); let v = Math.round(Number(inp.value));
       if (!Number.isFinite(v)) v = PT_DEF[f[0]]; v = Math.max(f[2], Math.min(f[3], v));
@@ -505,7 +734,7 @@ function renderPoints() {
   $('#ptLog').innerHTML = S.ptLog.slice(-60).reverse().map(l => `<div>${new Date(l.time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} · <b>${esc(l.name)}</b> <span class="${l.d > 0 ? 'plus' : 'minus'}">${l.d > 0 ? '+' : ''}${l.d}</span> · ${esc(l.why)}</div>`).join('') || '<div class="sub">아직 없어요.</div>';
   renderBigPts();
 }
-function pushPt() { save(); renderPoints(); renderStudents(); broadcast({ t: 'pt', pt: publicPt() }); for (const st of students.values()) if (st.on) sendBal(st); }
+function pushPt() { save(); renderPoints(); renderStudents(); renderRooms(); broadcast({ t: 'pt', pt: publicPt() }); for (const st of students.values()) if (st.on) sendBal(st); }
 let bigPts = false;
 function renderBigPts() {
   const el = $('#bigPts'); el.classList.toggle('hidden', !bigPts); if (!bigPts) return;
@@ -514,8 +743,7 @@ function renderBigPts() {
 }
 
 /* ---------- 도울 학생 (찍기 실수) ---------- */
-/* 판 끝 규칙 고르기: 결과를 보낸 판(gid)의 선수만, 한 번만 */
-function ruleAns(st, m) {
+function ruleAns(st, m) {   // 판 끝 규칙 고르기: 결과를 보낸 판(gid)의 선수만, 한 번만
   const g = S.games.find(x => x.gid === m.gid);
   if (!g || g.dir == null || !g.players.some(p => p.name === st.name)) return;
   g.ruled = g.ruled || {};
@@ -538,12 +766,11 @@ function helpRows() {
   S.miss.forEach(x => { if (todayStr(x.time) !== today || x.time <= (S.helped[x.name] || 0)) return; (by[x.name] = by[x.name] || []).push(x); });
   return Object.entries(by).filter(([, l]) => l.length >= HELP_N).map(([name, l]) => ({ name, l })).sort((a, b) => b.l.length - a.l.length);
 }
-function renderHelpCount() { $('#helpCnt').textContent = helpRows().length + hands.size; $('#helpCnt').parentElement.classList.toggle('alarm', hands.size > 0); }
+function renderHelpCount() { $('#helpCnt').textContent = helpRows().length + hands.size; $('#jHelp').classList.toggle('alarm', hands.size > 0); }
 function renderHelp() {
   renderHelpCount();
-  if ($('[data-pane="help"]').classList.contains('hidden')) return;
   const P2 = p => CoordKit.pt(p.x, p.y);
-  $('#handList').innerHTML = [...hands.entries()].sort((a, b) => a[1] - b[1]).map(([n, t]) => `<div class="help" style="border-color:var(--accent)"><div class="nm">✋ ${esc(n)} <span class="sub">${new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}에 손 들었어요 · ${esc((([...students.values()].find(s => s.name === n && s.on) || {}).status) || '')}</span></div><button class="btn sm" data-hand="${esc(n)}">✓ 확인했어요</button></div>`).join('') || '<p class="sub">손든 학생이 없어요.</p>';
+  $('#handList').innerHTML = [...hands.entries()].sort((a, b) => a[1] - b[1]).map(([n, t]) => `<div class="help"><div class="nm">✋ ${esc(n)} <span class="sub">${new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}에 손 들었어요 · ${esc((([...students.values()].find(s => s.name === n && s.on) || {}).status) || '')}</span></div><button class="btn sm" data-hand="${esc(n)}">✓ 확인했어요</button></div>`).join('') || '<p class="sub">손든 학생이 없어요.</p>';
   $('#helpList').innerHTML = helpRows().map(({ name, l }) => {
     const cnt = {}; l.forEach(x => cnt[x.type] = (cnt[x.type] || 0) + 1);
     const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
@@ -567,12 +794,14 @@ function renderControl() {
   $('#optQuad').checked = S.settings.quad !== false; $('#optDuo').checked = S.settings.duo !== false;
   $('#optThick').checked = !!S.settings.thick; $('#btnThick').classList.toggle('pri', !!S.settings.thick);
   $('#optPenalty').checked = S.settings.penalty; $('#optAlt').checked = S.settings.alt; $('#optShow').checked = S.settings.showCall; $('#optCpu').checked = S.settings.cpu; $('#optSolo').checked = S.settings.solo;
-  $('#btnPause').textContent = S.pause.on ? '▶ 멈춤 풀기' : '✋ 전체 멈춤';
-  $('#btnPause').className = 'btn ' + (S.pause.on ? 'pri' : 'acc');
-  $('#pauseState').textContent = S.pause.on ? '지금 학생 화면이 멈춰 있어요.' : '';
-  $('#pauseMsg').value = S.pause.msg;
+  const p = $('#btnPause');
+  p.textContent = S.pause.on ? '▶ 멈춤 풀기 (지금 학생 화면이 멈춰 있어요)' : '✋ 모든 학생 화면 멈추기';
+  p.classList.toggle('paused', S.pause.on);
+  if (document.activeElement !== $('#pauseMsg')) $('#pauseMsg').value = S.pause.msg;
+  slPauseBtns();
 }
 function pushSettings() { save(); renderControl(); broadcast({ t: 'settings', settings: S.settings }); }
+function setPause(on) { S.pause = { on: !!on, msg: $('#pauseMsg').value.trim() || '선생님을 봐 주세요' }; save(); renderControl(); broadcast({ t: 'pause', on: S.pause.on, msg: S.pause.msg }); }
 
 /* ---------- 퀴즈 ---------- */
 let draft = null, bigQuiz = false;
@@ -619,7 +848,7 @@ function quizHTML(q, projector) {
   }
   return h + '</div></div>';
 }
-function renderQuizCount() { if (!$('[data-pane="quiz"]').classList.contains('hidden')) renderQuiz(); }
+function renderQuizCount() { if (S.quiz && S.quiz.sent) renderQuiz(); }
 function renderBigQuiz() {
   const el = $('#bigQuiz'); el.classList.toggle('hidden', !bigQuiz);
   if (!bigQuiz) return;
@@ -627,41 +856,168 @@ function renderBigQuiz() {
   el.innerHTML = (q ? quizHTML(q, true) : '<div class="qtext">아직 낸 문제가 없어요.</div>') + '<p class="sub" style="margin-top:20px">화면을 누르면 닫혀요 (이름과 정답은 정답 공개 전까지 보이지 않아요)</p>';
 }
 
-/* ---------- 탭·버튼 ---------- */
+/* ---------- 📺 크게 보기 (수업 코드 + QR) ---------- */
 function studentURL() { return new URL('index.html?c=' + S.code, location.href).href; }
-function bind() {
-  $$('#tabs button').forEach(b => b.onclick = () => {
-    $$('#tabs button').forEach(x => x.classList.toggle('on', x === b));
-    $$('[data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
-    if (b.dataset.tab === 'records') renderRecords();
-    if (b.dataset.tab === 'quiz') renderQuiz();
-    if (b.dataset.tab === 'points') renderPoints();
-    if (b.dataset.tab === 'help') renderHelp();
+function drawQR(el, size) {
+  el.innerHTML = '';
+  if (!window.QRCode) { el.innerHTML = '<div class="sub" style="line-height:1.4;padding:20px">QR을 불러오지 못했어요<br>(인터넷 확인)</div>'; return; }
+  try { new QRCode(el, { text: studentURL(), width: size, height: size, correctLevel: QRCode.CorrectLevel.M }); } catch (e) { }
+}
+function openBig() {
+  $('#bigCode').textContent = S.code; $('#bigUrl').textContent = studentURL(); $('#bigCount').textContent = `들어온 학생 ${onlineCount()}명`;
+  drawQR($('#bigQR'), 480);
+  $('#big').classList.remove('hidden');
+}
+
+/* ---------- 📽 수업 슬라이드 ----------
+   기본 내용은 slides.js, 이 화면에서 고친 글은 S.slEdit 에 저장. ← → 로 넘기고, 단계(steps)가 있는 장은 하나씩 나타남 */
+const SL = { on: false, editing: false, step: 0 };
+function slides() { const E = S.slEdit || {}; return (window.DEFAULT_SLIDES || []).map(d => Object.assign({}, d, E[d.id] || {})); }
+function curSlide() { const L = slides(); return L[Math.min(S.slide || 0, L.length - 1)]; }
+function openSlides() {
+  SL.on = true; SL.step = 0; if (S.slide == null) S.slide = 0;
+  $('#sl').classList.add('on');
+  try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => { }); } catch (e) { }
+  renderSlide();
+}
+function closeSlides() {
+  SL.on = false; SL.editing = false; $('#sl').classList.remove('on');
+  if (S.ask && S.ask.open) closeAsk();
+  try { document.fullscreenElement && document.exitFullscreen(); } catch (e) { }
+}
+function goSlide(d) {
+  const L = slides(), sd = curSlide(), steps = SL.editing ? 0 : (sd.steps || 0);
+  if (d > 0 && SL.step < steps) { SL.step++; applySteps(); return; }
+  if (d < 0 && SL.step > 0) { SL.step--; applySteps(); return; }
+  const i = Math.max(0, Math.min(L.length - 1, (S.slide || 0) + d)); if (i === S.slide) return;
+  S.slide = i; SL.step = d < 0 ? (L[i].steps || 0) : 0; save(); renderSlide();
+}
+function applySteps() {
+  const all = SL.editing;
+  $$('#slFrame [data-s]').forEach(el => el.classList.toggle('hid', !all && Number(el.dataset.s) > SL.step));
+  $$('#slFrame [data-h]').forEach(el => el.classList.toggle('hid', !all && Number(el.dataset.h) <= SL.step));
+  const sd = curSlide(), L = slides();
+  $('#slPage').textContent = `${Math.min(S.slide || 0, L.length - 1) + 1} / ${L.length}` + (sd.steps && !all ? ` · ${SL.step}/${sd.steps}단계` : '');
+}
+function fitSlide() { const f = $('#slFrame'); const k = Math.min(innerWidth / 1600, (innerHeight - 44) / 900); f.style.transform = `scale(${k})`; f.style.left = ((innerWidth - 1600 * k) / 2) + 'px'; f.style.top = Math.max(0, (innerHeight - 44 - 900 * k) / 2) + 'px'; }
+addEventListener('resize', () => { if (SL.on) fitSlide(); });
+function ed(f, html, tag) { return `<${tag || 'div'} class="ed" data-f="${f}">${html || ''}</${tag || 'div'}>`; }
+const fig = name => (window.SLIDE_FIGS && SLIDE_FIGS[name]) ? SLIDE_FIGS[name]() : '';
+function renderSlide() {
+  const L = slides(), i = Math.min(S.slide || 0, L.length - 1), sd = L[i];
+  const hd = `<div class="shd">${ed('title', sd.title, 'div')}<div class="stag">${ed('tag', sd.tag || '', 'span')}</div></div>`;
+  let h = '';
+  if (sd.kind === 'title') h = `<div class="scover"><div class="pic">${fig('quad').replace(/data-s="\d"/g, '')}</div><div class="ctext">${ed('kicker', sd.kicker)}${ed('title', sd.title)}${ed('sub', sd.sub)}</div></div>`;
+  else if (sd.kind === 'goal') h = hd + `<div class="sgoal"><div class="gl">이번 시간 목표</div>${ed('now', sd.now)}</div>`;
+  else if (sd.kind === 'join') h = hd + `<div class="sjoin"><div class="jl">${ed('body', sd.body)}</div><div class="jr"><div class="qr" id="slQR"></div><div class="jc">수업 코드 <b>${S.code}</b></div><div class="ju">${esc(studentURL())}</div></div></div>`;
+  else if (sd.kind === 'fig') h = hd + `<div class="sfig"><div class="tx">${ed('body', sd.body)}</div><div class="fg">${fig(sd.fig)}</div></div>`;
+  else if (sd.kind === 'ask') h = hd + `<div class="sask"><div><div class="aq">${ed('q', sd.q)}</div>${sd.hint ? `<div class="ah">${ed('hint', sd.hint)}</div>` : ''}<div class="afig">${fig(sd.fig)}</div></div><div><div class="sctl" id="askCtl"></div><div id="askRes"></div></div></div>`;
+  else h = hd + `<div class="stext">${ed('body', sd.body)}</div>`;
+  $('#slFrame').innerHTML = h;
+  $('#slEditBtn').classList.toggle('acc', SL.editing);
+  $$('#slFrame .blank').forEach(b => b.onclick = () => { if (!SL.editing) b.classList.toggle('show'); });
+  $$('#slFrame .ed').forEach(el => {
+    el.contentEditable = SL.editing ? 'true' : 'false';
+    el.onblur = () => { if (!SL.editing) return; const o = S.slEdit[sd.id] || (S.slEdit[sd.id] = {}); o[el.dataset.f] = el.innerHTML; save(); };
   });
+  if (sd.kind === 'join') drawQR($('#slQR'), 330);
+  if (sd.kind !== 'ask' && S.ask && S.ask.open) closeAsk();   // 의견 받기 장을 떠나면 질문 닫기
+  if (sd.kind === 'ask') renderAsk();
+  slPauseBtns(); applySteps(); fitSlide();
+}
+function slPauseBtns() { $('#slPauseOn').classList.toggle('acc', !!S.pause.on); $('#slPauseOff').classList.toggle('on2', !S.pause.on); }
+function toggleSlEdit() { SL.editing = !SL.editing; renderSlide(); if (SL.editing) toast('글자를 눌러 고치세요. 다른 곳을 누르면 저장돼요'); }
+function resetSlide() { const sd = curSlide(); if (!confirm('이 슬라이드의 글을 처음 내용으로 되돌릴까요?')) return; delete S.slEdit[sd.id]; save(); renderSlide(); }
+addEventListener('keydown', e => {
+  if (!SL.on) { if (e.key === 'Escape') { $('#big').classList.add('hidden'); bigQuiz = false; renderBigQuiz(); bigPts = false; renderBigPts(); } return; }
+  const t = e.target; if (SL.editing && t && t.isContentEditable) return; if (t && /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
+  if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); goSlide(1); }
+  else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); goSlide(-1); }
+  else if (e.key === 'Escape' && !document.fullscreenElement) closeSlides();
+});
+
+/* ---------- ❓ 의견 받기 (슬라이드의 ask 장) : 학생 패드에 고르기 + 까닭 쓰기 창이 뜸 ---------- */
+function publicAsk() {
+  const a = S.ask; if (!a) return null;
+  const p = { id: a.id, q: a.q, options: a.options };
+  if (a.revealed) p.reveal = { id: a.id, answer: a.answer, explain: a.explain };
+  return p;
+}
+const plain = html => { const d = document.createElement('div'); d.innerHTML = html || ''; return d.textContent.replace(/\s+/g, ' ').trim(); };
+function sendAsk() {
+  const sd = curSlide(); if (sd.kind !== 'ask') return;
+  if (!S.ask || S.ask.sid !== sd.id) S.ask = { id: 'a' + Date.now().toString(36), sid: sd.id, answers: {}, revealed: false };
+  Object.assign(S.ask, { q: plain(sd.q).slice(0, 200), options: sd.options.slice(), answer: sd.answer, explain: plain(sd.explain), open: true });
+  save(); broadcast({ t: 'ask', ask: publicAsk() }); renderAsk();
+}
+function closeAsk() { if (!S.ask) return; S.ask.open = false; save(); broadcast({ t: 'askClose' }); renderAsk(); }
+function revealAsk() {
+  if (!S.ask) return; S.ask.revealed = true; save();
+  if (S.ask.open) broadcast({ t: 'askReveal', id: S.ask.id, answer: S.ask.answer, explain: S.ask.explain });
+  renderAsk();
+}
+function clearAsk() {
+  if (!S.ask || !confirm('모은 답을 지우고 처음부터 다시 받을까요?')) return;
+  const open = S.ask.open; S.ask = null; save();
+  if (open) sendAsk(); else renderAsk();
+}
+function renderAsk() {
+  const c = $('#askCtl'), b = $('#askRes'); if (!c || !b) return;
+  const sd = curSlide(); if (sd.kind !== 'ask') return;
+  const a = (S.ask && S.ask.sid === sd.id) ? S.ask : null, open = !!(a && a.open);
+  const ans = a ? Object.entries(a.answers) : [];
+  const shown = !!(a && a.revealed);
+  c.innerHTML = `<span class="st">${open ? `학생 패드에 질문이 떠 있어요 · 답 <b>${ans.length}</b>/${onlineCount()}명` : (ans.length ? `질문을 닫았어요 · 답 ${ans.length}명` : '질문을 보내면 학생 패드에 고르는 창이 떠요')}</span>
+    ${open ? '<button data-a="close">질문 닫기</button>' : `<button class="acc" data-a="send">❓ ${ans.length ? '다시 열기' : '학생에게 질문 보내기'}</button>`}
+    <button class="okb" data-a="reveal" ${!a || shown ? 'disabled' : ''}>✔ 정답 공개</button>
+    ${a ? '<button data-a="clear">↺ 답 지우기</button>' : ''}
+    <label><input type="checkbox" data-a="names" ${S.hideNames ? 'checked' : ''}> 이름 가리기</label>`;
+  const opts = sd.options || [], counts = opts.map(() => 0);
+  ans.forEach(([, v]) => { if (counts[v.a] != null) counts[v.a]++; });
+  const tot = ans.length;
+  let h = '<div class="abars">' + opts.map((o, i) => {
+    const right = shown && i === sd.answer, pct = tot ? Math.round(100 * counts[i] / tot) : 0;
+    return `<div class="abar ${right ? 'right' : ''}"><span>${right ? '✔ ' : ''}${esc(o)}</span><div class="tr"><div class="fl" style="width:${pct}%"></div></div><span class="c">${counts[i]}명</span></div>`;
+  }).join('') + '</div>';
+  if (shown) h += `<div class="aexp">${mathify(plain(sd.explain))}</div>`;
+  const rs = ans.filter(([, v]) => v.r).sort((x, y) => x[1].a - y[1].a);
+  if (rs.length) h += '<div class="ans">' + rs.map(([n, v]) => `<div class="a"><div class="o">${esc(opts[v.a] || '')}</div><div>${esc(v.r)}</div>${S.hideNames ? '' : `<div class="n">${esc(n)}</div>`}</div>`).join('') + '</div>';
+  b.innerHTML = h;
+}
+
+/* ---------- 버튼 ---------- */
+function renderAll() { showCode(); renderControl(); renderStudents(); renderPoints(); renderHelp(); renderRooms(); renderQuiz(); }
+function bind() {
   $('#btnCopy').onclick = async () => {
     const u = studentURL();
     try { await navigator.clipboard.writeText(u); toast('복사했어요: ' + u); } catch (e) { prompt('학생용 주소', u); }
   };
-  $('#btnBig').onclick = () => { $('#bigCode').textContent = S.code; $('#bigUrl').textContent = studentURL(); $('#big').classList.remove('hidden'); };
+  $('#btnBig').onclick = openBig;
   $('#big').onclick = () => $('#big').classList.add('hidden');
+  $('#btnNewCode2').onclick = () => { if (changeCode()) toast('새 수업 코드: ' + S.code); };
+  $('#btnSlides').onclick = openSlides;
+  $('#slPrev').onclick = () => goSlide(-1); $('#slNext').onclick = () => goSlide(1);
+  $('#slPauseOn').onclick = () => setPause(true); $('#slPauseOff').onclick = () => setPause(false);
+  $('#slEditBtn').onclick = toggleSlEdit; $('#slResetBtn').onclick = resetSlide; $('#slClose').onclick = closeSlides;
+  $('#slFull').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+  $('#slFrame').addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'send') sendAsk(); else if (a === 'close') closeAsk(); else if (a === 'reveal') revealAsk(); else if (a === 'clear') clearAsk();
+    else if (a === 'names') { S.hideNames = b.checked; save(); renderAsk(); }
+  });
   $$('#segN button').forEach(b => b.onclick = () => { S.settings.n = Number(b.dataset.n); pushSettings(); });
   $$('#segLuck button').forEach(b => b.onclick = () => { S.settings.luck = b.dataset.l; pushSettings(); });
   $$('#segLv button').forEach(b => b.onclick = () => { S.settings.level = b.dataset.v; pushSettings(); if (b.dataset.v === 'low' && S.settings.luck === 'dice') toast('하 단계에서는 사분면 주사위를 쓰지 않아요'); });
-  $('#optRule').onchange = e => { S.settings.rule = e.target.checked; pushSettings(); };
-  $('#optPenalty').onchange = e => { S.settings.penalty = e.target.checked; pushSettings(); };
-  $('#optAlt').onchange = e => { S.settings.alt = e.target.checked; pushSettings(); };
-  $('#optShow').onchange = e => { S.settings.showCall = e.target.checked; pushSettings(); };
-  $('#optCpu').onchange = e => { S.settings.cpu = e.target.checked; pushSettings(); };
-  $('#optSolo').onchange = e => { S.settings.solo = e.target.checked; pushSettings(); };
-  $('#optQuad').onchange = e => { S.settings.quad = e.target.checked; pushSettings(); };
-  $('#optDuo').onchange = e => { S.settings.duo = e.target.checked; pushSettings(); };
+  [['optRule', 'rule'], ['optPenalty', 'penalty'], ['optAlt', 'alt'], ['optShow', 'showCall'], ['optCpu', 'cpu'], ['optSolo', 'solo'], ['optQuad', 'quad'], ['optDuo', 'duo']]
+    .forEach(([id, k]) => { $('#' + id).onchange = e => { S.settings[k] = e.target.checked; pushSettings(); }; });
   $('#optThick').onchange = e => { S.settings.thick = e.target.checked; pushSettings(); renderQuiz(); };
   $('#btnThick').onclick = () => { S.settings.thick = !S.settings.thick; pushSettings(); renderQuiz(); toast(S.settings.thick ? '📐 굵은 선으로 바꿨어요 (학생 화면도)' : '📐 기본 선으로 바꿨어요'); };
   $('#ptOn').onchange = e => { S.pt.on = e.target.checked; pushPt(); };
   $('#ptBody').addEventListener('click', e => {
     const b = e.target.closest('[data-adj]'); if (!b) return;
     const n = b.dataset.n, d = Number(b.dataset.adj);
-    const r = addPts(n, d, '선생님 조정'); save(); renderPoints(); renderStudents(); notify(n, r || 0, '선생님 조정');
+    const r = addPts(n, d, '선생님 조정'); save(); renderPoints(); renderStudents(); renderRooms(); notify(n, r || 0, '선생님 조정');
   });
   $('#handList').addEventListener('click', e => { const b = e.target.closest('[data-hand]'); if (b) handDone(b.dataset.hand); });
   $('#helpList').addEventListener('click', e => { const b = e.target.closest('[data-helped]'); if (!b) return; S.helped[b.dataset.helped] = Date.now(); save(); renderHelp(); });
@@ -675,7 +1031,7 @@ function bind() {
     S.ptLog.forEach(l => rows.push([new Date(l.time).toLocaleString('ko-KR'), l.name, l.d, l.why]));
     download(`좌표오목_포인트_${stamp()}.csv`, csv(rows));
   };
-  $('#btnPause').onclick = () => { S.pause = { on: !S.pause.on, msg: $('#pauseMsg').value.trim() || '선생님을 봐 주세요' }; save(); renderControl(); broadcast({ t: 'pause', on: S.pause.on, msg: S.pause.msg }); };
+  $('#btnPause').onclick = () => setPause(!S.pause.on);
   $('#btnHome').onclick = () => { if (confirm('모든 학생을 처음 화면으로 보낼까요? 진행 중인 판은 사라져요.')) { broadcast({ t: 'home' }); toast('처음 화면으로 보냈어요'); } };
   const sel = $('#qType'); Object.entries(CoordKit.TYPES).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; sel.appendChild(o); });
   $('#btnNewQ').onclick = () => {
@@ -694,8 +1050,8 @@ function bind() {
   $('#bigQuiz').onclick = () => { bigQuiz = false; renderBigQuiz(); };
   $$('#segRange button').forEach(b => b.onclick = () => { range = b.dataset.r; $$('#segRange button').forEach(x => x.classList.toggle('on', x === b)); renderRecords(); });
   $('#btnCsvS').onclick = () => {
-    const rows = [['이름', '대전', '승', '패', '무', '컴퓨터전 승', '컴퓨터전 판', '말하기', '찍기 성공', '찍기 실수', '찍기 정확도']];
-    Object.values(statsFor(range)).sort((a, b) => a.name.localeCompare(b.name, 'ko')).forEach(r => rows.push([r.name, r.games, r.win, r.lose, r.draw, r.cpuW, r.cpuG, r.calls, r.ok, r.bad, acc(r)]));
+    const rows = [['이름', '포인트', '대전', '승', '패', '무', '컴퓨터전 승', '컴퓨터전 판', '말하기', '찍기 성공', '찍기 실수', '찍기 정확도']];
+    Object.values(statsFor(range)).sort((a, b) => a.name.localeCompare(b.name, 'ko')).forEach(r => rows.push([r.name, S.pt.on ? bal(r.name) : '', r.games, r.win, r.lose, r.draw, r.cpuW, r.cpuG, r.calls, r.ok, r.bad, acc(r)]));
     download(`좌표오목_학생기록_${range === 'today' ? '오늘' : '전체'}_${stamp()}.csv`, csv(rows));
   };
   $('#btnCsvG').onclick = () => {
@@ -703,8 +1059,8 @@ function bind() {
     S.games.forEach(g => rows.push([new Date(g.time).toLocaleString('ko-KR'), MODE[g.mode], g.n, teamNames(g, 'A').replace(/&amp;/g, '&'), teamNames(g, 'B').replace(/&amp;/g, '&'), g.winner === 'draw' ? '무승부' : TEAM[g.winner] + ' 승', g.moves]));
     download(`좌표오목_경기기록_${stamp()}.csv`, csv(rows));
   };
-  $('#btnClearOff').onclick = () => { for (const [d, s] of students) if (!s.on) students.delete(d); renderStudents(); };
-  $('#btnSave').onclick = () => download(`좌표오목_백업_${stamp()}.json`, JSON.stringify({ app: 'coord-omok', ver: APP_VER, code: S.code, settings: S.settings, games: S.games, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped }, null, 1), 'application/json');
+  $('#btnClearOff').onclick = () => { for (const [d, s] of students) if (!s.on) students.delete(d); renderStudents(); renderRooms(); };
+  $('#btnSave').onclick = () => download(`좌표오목_백업_${stamp()}.json`, JSON.stringify({ app: 'coord-omok', ver: APP_VER, code: S.code, settings: S.settings, games: S.games, pt: S.pt, bal: S.bal, ptLog: S.ptLog, run: S.run, miss: S.miss, helped: S.helped, slEdit: S.slEdit }, null, 1), 'application/json');
   $('#fileLoad').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     try {
@@ -725,29 +1081,31 @@ function bind() {
       }
       if (Array.isArray(d.miss)) { const ids = new Set(S.miss.map(x => x.time + x.name)); d.miss.forEach(x => { if (x && x.name && !ids.has(x.time + x.name)) S.miss.push(x); }); S.miss.sort((a, b) => a.time - b.time); }
       if (d.helped && typeof d.helped === 'object') Object.assign(S.helped, d.helped);
-      save(); renderRecords(); renderControl(); renderStudents(); pushSettings(); pushPt(); renderHelp();
+      if (d.slEdit && typeof d.slEdit === 'object') Object.assign(S.slEdit, d.slEdit);
+      save(); pushSettings(); pushPt(); renderAll();
       toast(`불러왔어요 (새 경기 기록 ${add}개${ptMsg})`);
     } catch (err) { alert('백업 파일을 읽지 못했어요.'); }
     e.target.value = '';
   };
   $('#btnReset').onclick = () => {
     const pick = { g: $('#rsGames').checked, o: $('#rsOff').checked, q: $('#rsQuiz').checked, c: $('#rsCode').checked, p: $('#rsPts').checked, m: $('#rsMiss').checked };
-    if (!pick.g && !pick.o && !pick.q && !pick.c && !pick.p && !pick.m) return;
+    if (!Object.values(pick).some(Boolean)) return;
     if (!confirm('선택한 항목을 초기화할까요? 되돌릴 수 없어요. (먼저 백업 저장을 권해요)')) return;
     if (pick.g) S.games = [];
     if (pick.o) for (const [d, s] of students) if (!s.on) students.delete(d);
-    if (pick.q) { if (S.quiz) broadcast({ t: 'quizClose' }); S.quiz = null; draft = null; }
+    if (pick.q) { if (S.quiz) broadcast({ t: 'quizClose' }); if (S.ask && S.ask.open) broadcast({ t: 'askClose' }); S.quiz = null; draft = null; S.ask = null; }
     if (pick.p) { S.bal = {}; S.run = {}; S.ptLog = []; pushPt(); }
     if (pick.m) { S.miss = []; S.helped = {}; }
-    save(); renderRecords(); renderStudents(); renderQuiz(); renderPoints(); renderHelp();
-    if (pick.c) { if (onlineCount() && !confirm('수업 코드를 바꾸면 지금 접속한 학생 연결이 끊겨요. 계속할까요?')) return; S.code = String(1000 + Math.floor(Math.random() * 9000)); save(); students.clear(); renderStudents(); startPeer(); }
+    save(); renderAll();
+    if (pick.c) changeCode();
     toast('초기화했어요');
   };
   window.addEventListener('beforeunload', e => { if (onlineCount()) { e.preventDefault(); e.returnValue = ''; } });
+  setInterval(renderRooms, 30000);
 }
 
-(async function init() {
-  save(); bind(); renderControl(); renderStudents(); renderRecords(); renderPoints(); renderHelp();
+(function init() {
+  save(); bind(); renderAll();
   startPeer();
 })();
 </script>
